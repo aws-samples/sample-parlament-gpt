@@ -99,6 +99,11 @@ def test_search_normalizes_a_transcript():
     assert row["doc_id"] == "377739@DE"               # composite key
     assert row["session_ref"] == "5206"
     assert out["total"] == 1
+    # Swiss terms require displaying the download date (COMPLIANCE.md C2): every record
+    # must carry an ISO retrieval date for the UI to render beside the attribution.
+    import re as _re
+
+    assert _re.fullmatch(r"\d{4}-\d{2}-\d{2}", row["extras"]["retrieved_at"])
 
 
 def test_language_of_text_is_used_not_the_language_axis():

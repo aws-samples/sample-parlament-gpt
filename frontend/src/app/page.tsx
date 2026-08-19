@@ -697,6 +697,13 @@ function Citations({ sources }: { sources: Source[] }) {
                     {s.text_status === "scanned" ? "scanned transcript" : "uncorrected transcript"}
                   </span>
                 )}
+                {typeof s.extras?.retrieved_at === "string" && (
+                  // Sources whose terms require a download date (Switzerland) carry it in
+                  // extras; rendering it is a licence obligation, not decoration.
+                  <span className="badge">
+                    {MESSAGES.retrievedLabel} {s.extras.retrieved_at}
+                  </span>
+                )}
                 {safeHttpUrl(s.source_url) ? (
                   <>
                     {" "}

@@ -22,7 +22,7 @@ derivative-work and "presented as official" halves below still need a human deci
 | 🇩🇪 Germany (DIP) | Bundestag terms of use | Yes — rendered | ✅ Live | None. Uses a shared demo key today — see [C6](#c6-germany-is-running-on-a-public-demo-api-key) |
 | 🇬🇧 UK (Hansard) | Open Parliament Licence v3.0 | Yes — rendered | ✅ Live | [C1](#c1-uk-open-parliament-licence-wording-unverified) — exact wording unverified |
 | 🇪🇺 EU Parliament | CC BY 4.0 | Yes — rendered | ✅ Live | None |
-| 🇨🇭 Switzerland | Binding, specific terms | Yes — rendered, **but incomplete** | ✅ Live | [C2](#c2-switzerland-requires-a-download-date-we-do-not-display) — download date missing |
+| 🇨🇭 Switzerland | Binding, specific terms | Yes — rendered, incl. download date | ✅ Live | None — [C2](#c2-switzerland-requires-a-download-date-we-do-not-display) resolved |
 | 🇦🇹 Austria | CC BY 4.0 + disclaimer | Yes — rendered | ✅ Live | [C3](#c3-austria-reserves-the-right-to-prohibit-specific-uses) — noted, not blocking |
 | 🇺🇸 US Congress | Public domain (GPO) | Courtesy only | ⚙️ Opt-in (`enableUsCongress=true`; the demo deploys it) | None — no licensing constraint; operator requests the free api.data.gov key |
 | 🇨🇦 Canada | Speaker's permission — **excludes commercial use** | Yes + "not official" disclaimer | ❌ **Disabled** | [C4](#c4-canada-commercial-use-carve-out) **and** [C5](#c5-canada-robotstxt-disallows-the-search-endpoint) |
@@ -92,23 +92,17 @@ That is the conventional formulation, but it was not read from the source.
 **Action:** read the licence page from a normal browser and confirm the wording. Cheap; just needs
 doing by a human who isn't behind the bot challenge.
 
-### C2 — Switzerland requires a download date we do not display
-**Blocks:** nothing, but we are **currently not fully compliant** while Switzerland is live.
+### C2 — Switzerland requires a download date *(resolved)*
+**Blocks:** nothing — all four requirements are now satisfied.
 
-Swiss terms are binding and specific. Four requirements; we satisfy three:
+Swiss terms are binding and specific. Four requirements:
 
 | Requirement | Status |
 |---|---|
 | Cite «Parlamentsdienste der Bundesversammlung, Bern» | ✅ Rendered |
 | Must not alter content | ✅ Text is excerpted, never rewritten |
 | Must not present as an official publication | ✅ No such claim |
-| **Must display the download date** | ❌ **Not implemented** |
-
-We do not store a retrieval timestamp per record, so the UI cannot show one.
-
-**Action:** add a retrieval timestamp to the Swiss adapter's results and render it. Small change
-(the `extras` field already exists for it), but it is an unmet obligation *today*. See
-[§3](#3-outstanding-work-once-compliance-is-cleared) W1.
+| Must display the download date | ✅ Every Swiss record carries `extras.retrieved_at` (UTC date, asserted by an adapter test); the UI renders it beside the citation |
 
 ### C3 — Austria reserves the right to prohibit specific uses
 **Blocks:** nothing. Recorded so it isn't a surprise.
@@ -152,9 +146,9 @@ instant; 36,000 req/hour) and fills it. The demo deployment runs with an issued 
 
 Ordered by dependency. Nothing here is started; all of it is deliberately deferred.
 
-### W1 — Swiss download-date display *(no compliance gate; do this regardless)*
-Store a retrieval timestamp per Swiss record and render it beside the attribution. Closes
-[C2](#c2-switzerland-requires-a-download-date-we-do-not-display). **Est. 2–3 h.**
+### W1 — Swiss download-date display *(done)*
+**Resolved:** every Swiss record carries `extras.retrieved_at` and the UI renders it beside
+the citation. Closed [C2](#c2-switzerland-requires-a-download-date-we-do-not-display).
 
 ### W2 — Fill the two API-key secrets *(no gate)*
 Own DIP key ([C6](#c6-germany-is-running-on-a-public-demo-api-key)) and a GovInfo key

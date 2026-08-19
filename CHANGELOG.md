@@ -61,6 +61,9 @@ Per-jurisdiction data-source details live in `docs/multi-gov/CHANGES.md`.
   A3, system diagram: US Congress opt-in).
 
 ### Fixed
+- **Swiss download-date obligation met (COMPLIANCE.md C2/W1)**: every Swiss record now
+  carries `extras.retrieved_at` (UTC date, asserted by an adapter test) and the UI
+  renders it beside the citation — the last unmet licence requirement of a live source.
 - `infra/jest.config.js` was missing from the published sample: the nested
   `infra/.gitignore`'s `*.js` overrides the root-level negation, so fresh clones (and the
   content sync) silently dropped it and the sample could not run its infra tests. The

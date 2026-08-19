@@ -263,11 +263,20 @@ class SwissAdapter:
             language_text=spoken,
             is_translation=False,
             text_status="final",
-            extras=_extras(row),
+            # retrieved_at satisfies the Swiss terms' download-date display duty
+            # (COMPLIANCE.md C2): the UI renders it beside the attribution.
+            extras={**_extras(row), "retrieved_at": _today_utc()},
         )
 
 
 # --- pure helpers ----------------------------------------------------------------
+
+
+def _today_utc() -> str:
+    """UTC date of retrieval — the Swiss terms require displaying the download date."""
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).date().isoformat()
 
 
 def _escape(value: str) -> str:

@@ -28,4 +28,5 @@ export const MESSAGES = {
   stageBedrock: "bedrock",
   stageLambda: "lambda",
   guardrailIntervened: "Guardrail intervened",
+  retrievedLabel: "retrieved",
 } as const;
