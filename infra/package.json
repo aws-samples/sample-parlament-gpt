@@ -1,0 +1,28 @@
+{
+  "name": "parlamentgpt-infra",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "infra": "bin/app.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy --all --require-approval never",
+    "destroy": "cdk destroy --all --force",
+    "test": "jest"
+  },
+  "devDependencies": {
+    "@types/jest": "29.5.14",
+    "@types/node": "20.14.0",
+    "aws-cdk": "2.1127.0",
+    "jest": "29.7.0",
+    "ts-jest": "29.4.11",
+    "ts-node": "10.9.2",
+    "typescript": "5.5.3"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.265.0",
+    "constructs": "10.6.0"
+  }
+}

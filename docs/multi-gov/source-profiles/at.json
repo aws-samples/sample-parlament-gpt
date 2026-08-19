@@ -1,0 +1,174 @@
+{
+  "countryKey": "at",
+  "displayName": "Austria — Parlament (Nationalrat & Bundesrat)",
+  "verdict": "workable",
+  "hasLiveQueryApi": true,
+  "sourceName": "Parlament Österreich — Stenographische Protokolle via the site's global full-text search (\"Globale Suche\", filter definition VTS_01). Note: the OFFICIALLY DOCUMENTED Open Data endpoint for Stenographische Protokolle (/Filter/api/filter/data/211) is session-metadata only and has NO free-text search; the per-speech searchable endpoint used here is undocumented but open and returns the same public data.",
+  "hosts": [
+    "www.parlament.gv.at"
+  ],
+  "protocol": "HTTP/2 JSON over POST. Custom \"filter/VTS\" JSON API (Java/RESTEasy backend, Solr-backed). Not REST, not OData, no OpenAPI document. Filters go in the POST JSON body; paging/sorting go in the query string. GET returns 405.",
+  "auth": "none — fully open, no API key, no token, no cookie, no Referer/Origin required. Verified with plain curl and no headers beyond Content-Type: application/json. Nothing to register. Data is CC BY 4.0 (attribution: Parlamentsdirektion); contact ogd@parlament.gv.at.",
+  "searchEndpoint": "POST /Filter/api/filterform/vts/data?FBEZ=VTS_01  (debate/speech free-text search — THIS is the one to use). Companion: POST /Filter/api/filterform/vts/form?FBEZ=VTS_01 returns the full facet/dimension vocabulary. Documented-but-unsuitable alternative: POST /Filter/api/filter/data/211?js=eval&showAll=true (session list, no free-text). Per-speech full text: GET /dokument/{GP}/{NRSITZ|BRSITZ}/{sessionNo}/{file}.html. Speaker+party roster per session: GET /gegenstand/{GP}/{NRSITZ|BRSITZ}/{sessionNo}?json=TRUE",
+  "exampleRequest": "curl -X POST 'https://www.parlament.gv.at/Filter/api/filterform/vts/data?FBEZ=VTS_01&page=1&pagesize=20&sort=datedesc' -H 'Content-Type: application/json' -d '{\"s.sm.query\":\"Klimaschutz\",\"category\":[\"Protokolle\"],\"gremium\":[\"Nationalrat\"],\"date_range\":[\"2023-01-01T00:00:00.000Z\",\"2023-12-31T23:59:59.000Z\"],\"searchType\":[\"all\"],\"searchScope\":[\"all\"]}'",
+  "verified": true,
+  "verificationNote": "Executed live (2026-08-03), all via curl from this sandbox — no blocks.\n\n(1) The literal exampleRequest above → HTTP 200, {\"count\":226,\"pages\":12,\"meta\":{\"totalHits\":226}}. First row observed verbatim: item_id=\"22012722\", item_id_with_type=\"D22012722\", item_type=\"stteil\", label=\"Protokolle\", type=\"html\", link=\"/dokument/XXVII/NRSITZ/247/A_-_15_48_01_00313619.html\", title=\"Teil des Stenogr. Protokolls der 247. Sitzung der XXVII. GP des Nationalrates: 15:48:01 Abgeordneter Christoph Stark (ÖVP)\", datetime=\"2023-12-14T23:00:00.000Z\", relatedLink=\"/XXVII/NRSITZ/247\", weiterfuehrender_link='{\"url\":\"/gegenstand/XXVII/NRSITZ/247?selectedStage=111&stid=313619\",\"text\":\"Plenarsitzung: 247. Sitzung des Nationalrats vom 15. Dezember 2023 (247/NRSITZ)\"}', description containing <span class=\"highlight\">Klimaschutz</span>.\n\n(2) Pagination proven distinct: page=1&pagesize=5 vs page=2&pagesize=5 on the same body returned disjoint row sets; count=1210/pages=242 consistent.\n\n(3) sort=dateasc → oldest first (1991-11-13); sort=datedesc → newest (2026-07-07). sort omitted → relevance, and rows then additionally carry a \"score\" float (e.g. 13.322790145874023). \"score\" is ABSENT when sort=datedesc/dateasc.\n\n(4) Facet vocabulary pulled live from .../vts/form?FBEZ=VTS_01 (349,701 bytes): dimensions are category, date_range(DATERANGE), gp_liste, gremium, doktyp, schlagwort, name_nvg, s.sm.query(search), searchType(RADIO), searchScope(RADIO), thema. category has value \"Protokolle\" (219,885 items). gremium = Nationalrat / Bundesrat / Bundesversammlung. gp_liste runs \"PN\"/\"KN\"/I…XXVIII plus \"BR\"/\"BV\", each labelled with its date span.\n\n(5) Per-speech full text fetched: GET /dokument/XXVII/NRSITZ/262/A_-_17_00_42_00323450.html → 200, 11,888 bytes, real floor speech beginning \"Herr Präsident! Werte Abgeordnete! … CO2-Bepreisung und Klimabonus sind das Herzstück der ökosozialen Steuerreform\" including stage directions \"(Beifall bei den Grünen.)\".\n\n(6) Structured speaker+party roster fetched: GET /gegenstand/XXVII/NRSITZ/262?json=TRUE → 200, 218,183 bytes; content[0].stages[] contains {\"date\":\"15.05.2024\",\"text\":\"Wortmeldungen in der Debatte\",\"reden\":{\"rendertype\":\"table\",\"data\":{\"header\":[{\"label\":\"Name und Klub\"},{\"label\":\"Wortmeldungsart\"},{\"label\":\"Protokoll\"},{\"label\":\"Video\"}],\"rows\":[[\"<a href=\\\"/person/83135\\\">Petra Steger (F)</a>\",\"Unterzeichner\",[{\"gp_code\":\"XXVII\",\"sitzung_id\":262,\"fund_von\":112,\"fund_bis\":118,\"url\":\".../fnameorig_1672234.html#RU_322923\"}],{\"url\":\"/aktuelles/mediathek/XXVII/NRSITZ/262?DEBATTE=151&TS=1715768739\"}], …]}}}.\n\n(7) Documented OGD endpoint confirmed working but session-level only: POST /Filter/api/filter/data/211?js=eval&showAll=true with body {\"GP_CODE\":[\"XXVII\"],\"NBVS\":[\"NRSITZ\"],\"DATUM\":[\"2023-02-01\",\"2023-08-01\"]} → 200, count=31, pages=1, rows are flat arrays like [\"27.04.2023\",\"/gegenstand/XXVII/NRSITZ/210\",\"XXVII\",\"NRSITZ\",210,\"210. Sitzung (210/NRSITZ)\",\"210/NRSITZ\",\"Plenarsitzung\",...]. It accepts only NBVS/GP_CODE/DATUM — no free-text dimension exists on it.\n\n(8) Bundesrat verified on the same VTS endpoint: gremium=[\"Bundesrat\"] → count=1071, rows like item_type=\"stteil\", /dokument/BR/BRSITZ/994/A_-_10_31_10_01006130.html.\n\n(9) Rate-limit probe: 8 back-to-back POSTs → all 200, ~0.23–0.26 s each, no 429 and no throttling observed.\n\nUNVERIFIED / NEGATIVE RESULTS (each actually attempted):\n- name_nvg (speaker facet) does NOT work on speeches. {\"s.sm.query\":\"Klimaschutz\",\"name_nvg\":[\"Gewessler Leonore, BA\"]} → count=6358 but every row is item_type \"PMGesch\" (motions), category NOT \"Protokolle\". Adding category=[\"Protokolle\"] → count=0 (also 0 when combined with date_range). Values must match the form vocabulary exactly (\"Gewessler Leonore, BA\"); \"Gewessler Leonore\" → count=0. Conclusion: name_nvg indexes tabled-document authorship, not floor speakers.\n- date_range format is strict and fails SILENTLY/500. [\"2023-01-01\",\"2023-12-31\"], [\"01.01.2023\",\"31.12.2023\"], [\"2023-01-01T00:00:00\"] (no Z), \"2023-01-01 - 2023-12-31\", nested arrays, and {\"von\":…,\"bis\":…} all returned a response with NO count/pages/rows key (HTTP 500 with a Java org.json.JSONObject stack trace when combined with other facets). Only full ISO-8601 with milliseconds+Z works: [\"2023-01-01T00:00:00.000Z\",\"2023-12-31T23:59:59.000Z\"] → count=226.\n- &fromDate= / &toDate= query-string params (present in the frontend bundle) had NO effect on results — sending fromDate=2023-01-01 still returned 2026 rows and identical count=3175. Do not use them.\n- Unknown JSON body keys are silently IGNORED, not rejected: {\"DATUM\":[...]} and {\"date_fresh\":[...]} both returned the unfiltered count=4246. There is no error signal for a typo'd dimension — this is the single biggest trap.\n- I did not exercise deep paging (page>242) or confirm any hard result-window cap, so max reachable offset is UNVERIFIED.\n- No published rate limit, SLA, or changelog for the VTS endpoint exists — its stability is UNVERIFIED and it is not covered by the Open Data documentation.",
+  "queryParams": [
+    {
+      "purpose": "freetext",
+      "param": "s.sm.query",
+      "note": "JSON BODY, plain string (NOT an array) — this is the one exception among the body dimensions. Verified: {\"s.sm.query\":\"Klimaschutz\"} → totalHits 33202 site-wide. Searches full speech text when searchScope=all."
+    },
+    {
+      "purpose": "date_from",
+      "param": "date_range[0]",
+      "note": "JSON BODY array of exactly 2 elements. MUST be full ISO-8601 with milliseconds and Z: \"2023-01-01T00:00:00.000Z\". Any shorter form causes a silent no-result or HTTP 500. Filters on the sitting date."
+    },
+    {
+      "purpose": "date_to",
+      "param": "date_range[1]",
+      "note": "Second element of the same date_range array, same strict format, e.g. \"2023-12-31T23:59:59.000Z\". Inclusive: verified boundary hits on 2023-01-24 and 2023-12-14."
+    },
+    {
+      "purpose": "speaker",
+      "param": "name_nvg",
+      "note": "DOES NOT WORK FOR SPEECHES — verified count=0 when combined with category=Protokolle. It only matches tabled-document authorship (item_type PMGesch). To filter by speaker you MUST post-filter on the row `title` (format: \"... : HH:MM:SS Abgeordneter <Name> (<PARTY>)\") or cross-reference /gegenstand/{GP}/{ITYP}/{INR}?json=TRUE stages[].reden.data.rows[][0]."
+    },
+    {
+      "purpose": "chamber",
+      "param": "gremium",
+      "note": "JSON BODY array. Exact values: \"Nationalrat\" (lower house), \"Bundesrat\" (upper house), \"Bundesversammlung\". Both NR and BR verified returning item_type=stteil speech rows."
+    },
+    {
+      "purpose": "term",
+      "param": "gp_liste",
+      "note": "JSON BODY array of Roman-numeral Gesetzgebungsperiode codes: \"XXVIII\" (current, from 24.10.2024), \"XXVII\", … \"I\", plus \"KN\" (Konstituierende Nationalversammlung), \"PN\" (Provisorische Nationalversammlung), \"BR\", \"BV\". Verified with [\"XXVIII\",\"XXVII\"]."
+    },
+    {
+      "purpose": "page",
+      "param": "page",
+      "note": "QUERY STRING, 1-based. Verified page=1 vs page=2 return disjoint rows. (Do NOT use pageNumber — that is the legacy-filter param and triggers HTTP 500 on this endpoint.)"
+    },
+    {
+      "purpose": "size",
+      "param": "pagesize",
+      "note": "QUERY STRING. Verified at 3, 5, 20 and 100. UI offers 10/20/50; 100 worked in testing but is not officially sanctioned."
+    },
+    {
+      "purpose": "freetext",
+      "param": "category",
+      "note": "JSON BODY array — THE CRITICAL SCOPE FILTER. Set to [\"Protokolle\"] to restrict to verbatim records (219,885 docs). Omit it and you get bills, press releases (Parlamentskorrespondenz), images and videos mixed in."
+    },
+    {
+      "purpose": "freetext",
+      "param": "searchType",
+      "note": "JSON BODY array, RADIO. \"all\" (all words, default), \"any\" (any word), \"phrase\" (exact phrase). Verified: phrase narrowed 3947→211 on one query."
+    },
+    {
+      "purpose": "freetext",
+      "param": "searchScope",
+      "note": "JSON BODY array, RADIO. \"all\" = search entire document text (needed for real speech search); \"title\" = title/Betreff only. Verified: title-only narrowed 1210→210."
+    },
+    {
+      "purpose": "freetext",
+      "param": "sort",
+      "note": "QUERY STRING. \"datedesc\" (newest first), \"dateasc\" (oldest first), or omit for relevance ranking. Omitting it is the ONLY way to get the `score` field. Note \"sortrnr\"/\"SORTRNR\" are for other filter types and are ignored or break this endpoint."
+    },
+    {
+      "purpose": "freetext",
+      "param": "doktyp",
+      "note": "JSON BODY array, 412 values. Mostly document types for tabled items; almost nothing steno-specific (only \"BENQ-BR\" = Stenographisches Protokoll: Parlamentarische Enquete im BR, n=2). Use `category` for scoping instead."
+    },
+    {
+      "purpose": "freetext",
+      "param": "schlagwort",
+      "note": "JSON BODY array, 525 controlled subject keywords (EuroVoc-style). Optional topical narrowing."
+    },
+    {
+      "purpose": "freetext",
+      "param": "thema",
+      "note": "JSON BODY array, 20 broad policy themes. Optional."
+    }
+  ],
+  "pagination": "Offset paging via query string: `&page=N&pagesize=M`, N is 1-based. Response gives `count` (total matching docs), `pages` (ceil(count/pagesize)) and `meta.totalHits` (== count). Loop page=1..pages. Verified: count=1210 with pagesize=5 → pages=242, and page=1 vs page=2 returned disjoint row sets. IMPORTANT: the param is `page`, NOT `pageNumber` (pageNumber belongs to the legacy FILTERLEGACY filter type and yields HTTP 500 here). For bulk pulls you can also append `&showAll=true&export=true` (the pattern the site's own JSON export button uses), but I did not verify its behaviour or any hard result-window cap on this endpoint — deep paging beyond a few hundred pages is UNVERIFIED. Note `pages` is capped-looking on huge unscoped queries (site-wide \"Klimaschutz\" reported pages=500 for count=33202 at pagesize=20, i.e. ~1661 expected), so treat `pages` as advisory and stop when a page returns zero rows.",
+  "fieldMapping": [
+    {
+      "normalized": "title",
+      "sourcePath": "rows[].title",
+      "note": "Verbatim observed: \"Teil des Stenogr. Protokolls der 247. Sitzung der XXVII. GP des Nationalrates: 15:48:01 Abgeordneter Christoph Stark (ÖVP)\". Encodes session no, term, chamber, speech start time, speaker and party in one string. `title_highlighted` is the same with <span class=\"highlight\"> wrappers — prefer plain `title` for storage."
+    },
+    {
+      "normalized": "speaker",
+      "sourcePath": "rows[].title (regex) OR /gegenstand/{gp}/{ityp}/{inr}?json=TRUE → content[0].stages[].reden.data.rows[][0]",
+      "note": "NO dedicated speaker field on the search row. Parse title after the timestamp: /: \\d{2}:\\d{2}:\\d{2}\\s+(?:Abgeordnete[r]?|Bundesminister(?:in)?|Bundesrat|Präsident(?:in)?|Staatssekretär(?:in)?)?\\s*(.+?)\\s*\\(([^)]+)\\)\\s*$/ → group 1 = speaker. For authoritative names use the session detail JSON, whose row[0] is an anchor \"<a href=\\\"/person/83135\\\">Petra Steger (F)</a>\" giving a stable numeric person ID."
+    },
+    {
+      "normalized": "party",
+      "sourcePath": "rows[].title (parenthetical) OR session-detail stages[].reden.data.rows[][0]",
+      "note": "NO dedicated party field. Trailing parenthesis of `title` = club, verified value \"ÖVP\". Beware TWO different vocabularies: the search title uses long codes (ÖVP, SPÖ, FPÖ, GRÜNE, NEOS) while the session-detail \"Name und Klub\" anchor uses single letters (V=ÖVP, S=SPÖ, F=FPÖ, G=Grüne, N=NEOS) — verified \"(F)\" for Petra Steger and \"(V)\" for Karoline Edtstadler. Normalize both. Government-bench speakers may show a ministry title instead of a club."
+    },
+    {
+      "normalized": "date",
+      "sourcePath": "rows[].datetime",
+      "note": "ISO-8601 UTC, e.g. \"2023-12-14T23:00:00.000Z\". CAUTION: this is the local Vienna sitting date shifted to UTC, so it reads as the PREVIOUS calendar day (the 2023-12-14T23:00Z row is the 15 December 2023 sitting). Convert to Europe/Vienna before taking the date part, or take the authoritative German date from weiterfuehrender_link.text."
+    },
+    {
+      "normalized": "chamber",
+      "sourcePath": "derive from rows[].link / rows[].relatedLink path segment",
+      "note": "\"NRSITZ\" → Nationalrat, \"BRSITZ\" → Bundesrat (verified /dokument/BR/BRSITZ/994/...). Also inferable from the `title` substring \"des Nationalrates\"/\"des Bundesrates\". Send gremium in the request to constrain it up front."
+    },
+    {
+      "normalized": "term",
+      "sourcePath": "rows[].relatedLink segment 1 (or rows[].link segment 2)",
+      "note": "relatedLink \"/XXVII/NRSITZ/247\" → term \"XXVII\". Bundesrat rows use \"/BR/BRSITZ/994\" so term is literally \"BR\" there — fall back to parsing \"der XXVII. GP\" out of `title`, or map via the gp_liste facet whose labels carry the date spans."
+    },
+    {
+      "normalized": "sessionRef",
+      "sourcePath": "rows[].relatedLink + JSON.parse(rows[].weiterfuehrender_link)",
+      "note": "relatedLink \"/XXVII/NRSITZ/247\" gives term/chamber/sitting-number. weiterfuehrender_link is a JSON-ENCODED STRING (must be JSON.parse'd, it is not an object) → {\"url\":\"/gegenstand/XXVII/NRSITZ/247?selectedStage=111&stid=313619\",\"text\":\"Plenarsitzung: 247. Sitzung des Nationalrats vom 15. Dezember 2023 (247/NRSITZ)\"}. The `text` yields the human citation \"247/NRSITZ\" and the reliable sitting date; the `stid` query param is the debate-stage/speech ID."
+    },
+    {
+      "normalized": "snippet",
+      "sourcePath": "rows[].description",
+      "note": "Solr highlight fragments joined by literal \"...\" separators, with matches wrapped in <span class=\"highlight\">…</span> and HTML entities (&quot;, &#x2F;). Strip tags and unescape entities before indexing. It is a fragment, not the full speech."
+    },
+    {
+      "normalized": "sourceUrl",
+      "sourcePath": "'https://www.parlament.gv.at' + rows[].link",
+      "note": "rows[].link and rows[].display_link are site-relative and must be prefixed with the host (the Open Data docs state this explicitly). Verified: https://www.parlament.gv.at/dokument/XXVII/NRSITZ/247/A_-_15_48_01_00313619.html returns the speech. For the citable session page use 'https://www.parlament.gv.at' + JSON.parse(weiterfuehrender_link).url."
+    },
+    {
+      "normalized": "docId",
+      "sourcePath": "rows[].item_id (prefer rows[].item_id_with_type)",
+      "note": "item_id=\"22012722\" is a numeric string; item_id_with_type=\"D22012722\" adds a type prefix (D=document, E=editorial/PK) and is the safer primary key. A secondary stable key is the `stid` value inside weiterfuehrender_link.url (e.g. 313619), which also appears at the end of the filename A_-_15_48_01_00313619.html."
+    },
+    {
+      "normalized": "language",
+      "sourcePath": "not present in response — hardcode \"de\"",
+      "note": "No language field exists. All Stenographische Protokolle are German. An /en/ site mirror exists (https://www.parlament.gv.at/en/search returns 200) but the verbatim records themselves are not translated; do not expect en content from category=Protokolle."
+    }
+  ],
+  "fullTextAccess": "TWO-STEP, and step 2 is mandatory — the search response only carries highlight fragments (`description`), never the whole speech.\n\nStep 1: POST the VTS search, keep rows where item_type == \"stteil\" (= \"Stenographisches Protokoll Teil\", i.e. ONE speech by ONE speaker). These are pre-segmented per contribution, which is exactly the granularity wanted.\nStep 2: GET 'https://www.parlament.gv.at' + row.link. For stteil rows this is an HTML fragment (verified 11,888 bytes) containing the complete speech: speaker heading, the words spoken, and bracketed stage directions such as \"(Beifall bei den Grünen.)\" and \"(Präsidentin Bures übernimmt den Vorsitz.)\". Strip tags to get clean text. No auth, no cookie.\n\nFormat varies by era — you MUST branch on item_type:\n- item_type \"stteil\" (HTML, per-speech): current practice, ~XXI GP onward. The good case.\n- item_type \"stseite\" (HTML, filename SEITE_0181.html): older records segmented per PROTOCOL PAGE, not per speaker. A page may contain parts of several speeches. Verified for XX GP (1996).\n- item_type \"PMDok\" (type \"pdf\", filename imfname_142035.pdf): pre-~1996 sittings are SCANNED PDF IMAGES (\"Stenographisches Protokoll - gescannt als PDF-Image\"). Verified for XVIII GP (1991). Text comes from OCR behind the search index; there is no machine-readable text layer to rely on. Treat as unusable for a text pipeline.\n\nWhole-sitting protocol (PDF + HTML) is separately available from the session detail JSON at content[0].stdocuments[].documents[] — verified: [{\"link\":\"/dokument/XXVII/NRSITZ/262/fname_1672234.pdf\",\"type\":\"PDF\"},{\"link\":\"/dokument/XXVII/NRSITZ/262/fnameorig_1672234.html\",\"type\":\"HTML\"}]. Individual speeches inside that whole-sitting HTML are addressable by anchor (#RU_322923, #R_322950_4) with page ranges given as fund_von/fund_bis.\n\nThere is NO bulk dump / no zip / no XML corpus and no per-speech metadata API. Video (Mediathek) links are also exposed per speech in the session JSON (stages[].reden.data.rows[][3].url).",
+  "languages": "German only for the actual debate content (all Stenographische Protokolle are de-AT). No `language` field in the API response — hardcode \"de\". Facet labels, dimension names and the API surface itself are German (Gesetzgebungsperiode, Gremium, Suchbegriff). An English site mirror exists (/en/, https://www.parlament.gv.at/en/search → 200) and the OGD documentation has English pages, but verbatim records are not translated. Watch for German-specific text handling: umlauts/ß in query terms and speaker names (e.g. \"ÖVP\", \"GRÜNE\", \"Bundesministerin\"), and note the search index does stemming — querying \"Klimaschutz\" also highlighted \"Klimaschutzes\".",
+  "rateLimits": "No documented rate limit, quota, or SLA anywhere in the official Open Data pages. Empirically: 8 back-to-back POSTs all returned HTTP 200 in ~0.23–0.26 s each with no 429 and no throttling. robots.txt sets Crawl-Delay: 10 for AhrefsBot and 5 for bingbot (nothing for User-agent: *, whose block is a long list of Disallow'd /gegenstand/... stellungnahme paths — none of which affect /Filter/api/ or /dokument/); a historical comment in robots.txt about blocking the calendar due to \"hohe Last durch Robots\" shows they do care about load. The Disclaimer explicitly reserves the right to suspend or interrupt the Open Data offering at any time without notice, and to prohibit uses. Recommendation: self-throttle to ~1–2 req/s with a descriptive User-Agent and a contact address, cache aggressively (speech documents are immutable once the final protocol is published), and honour the CC BY 4.0 attribution to Parlamentsdirektion.",
+  "gotchas": [
+    "THE DEBATE-SEARCH ENDPOINT IS UNDOCUMENTED. /Filter/api/filterform/vts/data?FBEZ=VTS_01 appears nowhere in the Open Data documentation — I recovered it by downloading the site's SvelteKit bundle (chunk B33318mf.js) which builds it as `${base}/filterform/vts/data?FBEZ=${definition.bez}` for filter type VTS. It works and is open, but it carries no stability guarantee and could change without notice. Budget for a canary test in CI. This is the single reason this is 'workable' and not 'ready'.",
+    "THE OFFICIAL OPEN DATA ENDPOINT IS A TRAP FOR THIS USE CASE. The documented Stenographische Protokolle dataset (POST /Filter/api/filter/data/211?js=eval&showAll=true) accepts ONLY three dimensions — NBVS (NRSITZ/BRSITZ), GP_CODE (Roman numeral) and DATUM ([\"yyyy-mm-dd\",\"yyyy-mm-dd\"]) — and returns one row PER SITTING with links to whole-protocol PDF/HTML. There is NO free-text parameter and NO speech-level granularity. Verified: 31 sittings for XXVII/NRSITZ in Feb–Aug 2023. If someone builds against the documented dataset expecting search, the Lambda will be useless.",
+    "UNKNOWN BODY KEYS ARE SILENTLY IGNORED — no error, no warning. Verified: posting {\"DATUM\":[...]} or {\"date_fresh\":[...]} to the VTS endpoint returned the UNFILTERED count (4246) exactly as if no filter were sent. A typo in a dimension name yields plausible-looking but wrong (too broad) results. Always assert that adding a filter actually REDUCES `count`.",
+    "date_range HAS AN UNFORGIVING FORMAT AND FAILS DESTRUCTIVELY. Only [\"YYYY-MM-DDTHH:MM:SS.mmmZ\",\"YYYY-MM-DDTHH:MM:SS.mmmZ\"] works. I tested and confirmed failure for: bare \"2023-01-01\", German \"01.01.2023\", ISO without Z, \"from - to\" single string, nested arrays, and {\"von\":..,\"bis\":..} objects. Failures return a body with NO count/pages/rows keys, and in combination with other facets return HTTP 500 with a raw Java org.json.JSONObject stack trace. Naive JSON parsing will throw KeyError.",
+    "NO WORKING SPEAKER FILTER. The name_nvg facet (3,848 person values) looks like the answer but does NOT index floor speakers — verified {\"s.sm.query\":\"Klimaschutz\",\"name_nvg\":[\"Gewessler Leonore, BA\"]} returns 6,358 hits that are ALL item_type PMGesch (tabled motions), and adding category=[\"Protokolle\"] collapses it to count=0. Speaker filtering must be done client-side by regexing rows[].title, or by joining against the session detail JSON. Values must also match the facet vocabulary character-for-character (\"Gewessler Leonore\" → 0 hits vs \"Gewessler Leonore, BA\" → 6358).",
+    "OMITTING category=[\"Protokolle\"] SILENTLY POLLUTES RESULTS. Unscoped \"Klimaschutz\" returned 33,202 hits dominated by Parlamentskorrespondenz press releases and PMGesch motions. Always send category=[\"Protokolle\"] (219,885 docs) — and even then ~3% of rows in my 100-row samples were PMDok scanned-PDF wholesale protocols rather than per-speech stteil rows, so ALSO filter item_type == \"stteil\" client-side.",
+    "datetime IS OFF BY ONE DAY IF READ NAIVELY. It is the Vienna sitting date converted to UTC, so a 15 December 2023 sitting is stamped \"2023-12-14T23:00:00.000Z\" (and a May sitting as ...T22:00:00.000Z under CEST). Slicing the first 10 characters gives the WRONG date. Convert to Europe/Vienna, or read the German date out of JSON.parse(weiterfuehrender_link).text.",
+    "weiterfuehrender_link IS A JSON-ENCODED STRING, NOT AN OBJECT. Its value is literally '{\"url\":\"...\",\"text\":\"...\"}' with escaped quotes and must be JSON.parse'd a second time. Direct property access returns undefined.",
+    "NO SPEAKER OR PARTY FIELD EXISTS — both must be regexed out of the title string, and the party vocabulary is INCONSISTENT between endpoints: the search title uses long club codes (verified \"(ÖVP)\") while the session-detail roster uses single letters (verified \"(F)\" for FPÖ's Petra Steger, \"(V)\" for ÖVP's Karoline Edtstadler). Build an explicit V/S/F/G/N ↔ ÖVP/SPÖ/FPÖ/GRÜNE/NEOS mapping. Government-bench speakers carry a ministry title instead of a club, so party extraction will legitimately be null for ministers.",
+    "HISTORICAL COVERAGE DEGRADES SHARPLY BY ERA — three incompatible formats behind one API. Recent (~XXI GP+) = item_type \"stteil\", clean per-speech HTML. Mid (XX GP, e.g. 1996) = item_type \"stseite\", HTML segmented per PROTOCOL PAGE so one document can span multiple speakers. Pre-~1996 (verified XVIII GP, 1991) = item_type \"PMDok\", type \"pdf\", \"Stenographisches Protokoll - gescannt als PDF-Image\" — OCR'd scans with no reliable text layer. sort=dateasc surfaces the 1991 PDFs first, which will look like a parser bug. The documented dataset also states protocols are only available from the XX. Gesetzgebungsperiode onward.",
+    "THE `score` FIELD DISAPPEARS WHEN YOU SORT. It is present only for relevance ordering (sort param omitted) and ABSENT for sort=datedesc/dateasc — verified by KeyError. Do not require it unconditionally.",
+    "PAGINATION PARAM NAMES ARE TYPE-SPECIFIC AND WRONG ONES 500. Use &page= (VTS). &pageNumber= is for the legacy filter type and returned HTTP 500 here; &sortrnr=/&ascDesc= belong to the FILTER/MONGODB types and are ignored or break VTS (sortrnr=dateasc produced a null-count response). VTS sorting is &sort=. Also &fromDate=/&toDate= exist in the frontend code but had NO effect (count unchanged at 3175, 2026 rows still returned) — use the date_range body dimension instead.",
+    "`pages` IS NOT ALWAYS ceil(count/pagesize). Site-wide \"Klimaschutz\" reported pages=500 for count=33202 at pagesize=20 (~1661 expected), suggesting a server-side result-window cap. Treat `pages` as advisory, stop when a page yields zero rows, and prefer narrowing by gp_liste/date_range over deep paging. Max reachable offset is UNVERIFIED.",
+    "GET IS NOT SUPPORTED — the endpoint returns HTTP 405 for GET (allow: POST, OPTIONS). Filters cannot be expressed as a shareable URL against the API; only the human UI (/suche?...) takes query params. Any caching layer keyed on GET URLs needs a POST-body-aware cache key.",
+    "snippet AND title_highlighted CONTAIN MARKUP AND ENTITIES: <span class=\"highlight\">…</span> wrappers, literal \"...\" fragment joins, and HTML entities (&quot;, &#x2F;). Strip and unescape before embedding or indexing, or the highlight markup pollutes your vectors.",
+    "ALL rows[].link / display_link / relatedLink VALUES ARE SITE-RELATIVE and must be prefixed with https://www.parlament.gv.at — the official docs call this out explicitly as a common mistake. Note relatedLink omits the /dokument or /gegenstand prefix entirely (\"/XXVII/NRSITZ/247\"), so it is a citation key, not a fetchable URL.",
+    "LICENCE AND SUSPENSION RISK: data is CC BY 4.0 requiring attribution to Parlamentsdirektion, BUT the Disclaimer states not everything in the datasets is cleared for reuse (copyright/data-protection carve-outs per dataset), disclaims all accuracy/completeness liability even for slight negligence, and reserves the right to suspend the offering or prohibit specific uses \"zur Wahrung der Würde der parlamentarischen Körperschaften\". Protocols are also published in a preliminary (vorläufiges) form first and later corrected, so cached text can go stale."
+  ],
+  "confidence": "high"
+}

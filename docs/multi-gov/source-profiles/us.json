@@ -1,0 +1,147 @@
+{
+  "countryKey": "us",
+  "displayName": "United States — Congress (House & Senate)",
+  "verdict": "workable",
+  "hasLiveQueryApi": true,
+  "sourceName": "GovInfo API (U.S. Government Publishing Office) — Congressional Record collection (CREC). NOT api.congress.gov, which cannot free-text search speech text.",
+  "hosts": [
+    "api.govinfo.gov",
+    "www.govinfo.gov"
+  ],
+  "protocol": "REST/JSON. Search is POST with a JSON body (NOT GET, NOT OData, NOT GraphQL). Metadata/detail reads are GET. api_key travels as a query-string param (or X-Api-Key header) on api.govinfo.gov. Rendered document text on www.govinfo.gov/content/... is plain GET with NO key.",
+  "auth": "Free API key required on api.govinfo.gov, issued by api.data.gov. Register at https://www.govinfo.gov/api-signup (email only, key returned instantly, no approval step). Pass as `?api_key=<KEY>` or header `X-Api-Key: <KEY>`. Missing key -> HTTP 401 `{\"error\":{\"code\":\"API_KEY_MISSING\"}}`. The shared `DEMO_KEY` literal works but is throttled to ~10 req/hour (I observed `x-ratelimit-limit: 10` and repeated 429s), so it is unusable in production. Note: the full-text HTML on www.govinfo.gov/content/pkg/... needs NO key at all — verified 200 keyless.",
+  "searchEndpoint": "POST /search  (host api.govinfo.gov). Then per-hit GET /packages/{packageId}/granules/{granuleId}/summary for speaker+party, and GET https://www.govinfo.gov/content/pkg/{packageId}/html/{granuleId}.htm for the verbatim text.",
+  "exampleRequest": "curl -X POST 'https://api.govinfo.gov/search?api_key=DEMO_KEY' -H 'Content-Type: application/json' -d '{\"query\":\"collection:CREC \\\"climate change\\\" publishdate:range(2026-01-01,2026-03-31)\",\"pageSize\":20,\"offsetMark\":\"*\",\"sorts\":[{\"field\":\"publishdate\",\"sortOrder\":\"DESC\"}]}'  — search is POST-only, so there is no single literal GET URL that returns debate results. The two GET URLs in the pipeline ARE literal: https://api.govinfo.gov/packages/CREC-2026-07-20/granules/CREC-2026-07-20-pt1-PgH4667/summary?api_key=DEMO_KEY and https://www.govinfo.gov/content/pkg/CREC-2026-07-20/html/CREC-2026-07-20-pt1-PgH4667.htm",
+  "verified": true,
+  "verificationNote": "Executed live with DEMO_KEY on 2026-08-03. (1) POST /search with {\"query\":\"collection:CREC \\\"climate change\\\"\",\"pageSize\":3,\"offsetMark\":\"*\",\"sorts\":[{\"field\":\"publishdate\",\"sortOrder\":\"DESC\"}]} -> HTTP 200, \"count\":9433, real hits incl. granuleId \"CREC-2026-07-20-pt1-PgH4667\" title \"NEXT-GENERATION GEOTHERMAL RESEARCH AND DEVELOPMENT ACT\" dateIssued \"2026-07-20\", and \"Democrat Party Priorities (Executive Session)\" / CREC-2026-07-20-pt1-PgS4146-7. (2) Date range: adding publishdate:range(2026-01-01,2026-03-31) -> count dropped 9433->19, top hit dateIssued 2026-03-26 — range filter genuinely applied. (3) Speaker filter discriminates: member:B001291 -> count 3869, member:S001226 -> 1066, member:X999999 -> 0. (4) GET granule /summary -> HTTP 200 with members[] = [{role:\"SPEAKING\", chamber:\"H\", congress:\"119\", bioGuideId:\"B001291\", memberName:\"Babin, Brian\", state:\"TX\", party:\"R\", name:[{parsed:\"Mr. BABIN\", authority-fnf:\"Brian Babin\"}]}, {…\"Salinas, Andrea\", party:\"D\", state:\"OR\"}, {…\"Harrigan, Pat\", party:\"R\"}], plus granuleClass:\"HOUSE\", pagePrefix:\"H\", time:{from:\"17:20:00\",to:\"17:30:00\"}, detailsLink, committees[], references[] to HR 8790. (5) Verbatim text keyless: GET www.govinfo.gov/content/pkg/CREC-2026-07-20/html/CREC-2026-07-20-pt1-PgH4667.htm -> HTTP 200, 31995 bytes, body opens \"[Congressional Record Volume 172, Number 118 (Monday, July 20, 2026)] [House] [Pages H4667-H4670]\" then the actual floor words \"Mr. BABIN. Madam Speaker, I move to suspend the rules and pass the bill (H.R. 8790)…\". (6) GET /collections -> 200 confirming CREC = \"Congressional Record\". NEGATIVE CONTROL on the rejected candidate: GET api.congress.gov/v3/congressional-record?api_key=DEMO_KEY&format=json&q=climate returned byte-identical latest-issues payload as without q — the param is silently ignored; and the LoC's own openapi.json (fetched from github.com/LibraryOfCongress/api.congress.gov/Documentation/openapi.json, 289526 bytes) lists the ONLY params for /congressional-record as format, offset, limit, y, m, d. UNVERIFIED: `granuleclass:` and `congress:` as query operators inside /search — I hit the DEMO_KEY hourly cap before I could confirm and would need a registered key; `congress:` is documented on govinfo.gov/help/search-operators, `granuleclass` is not (see gotchas for the safe workaround). Also UNVERIFIED: `resultLevel:\"granule\"` is invalid — API replied HTTP 400 {\"message\":\"valid values for resultLevel are package/default\"} yet granule-level hits come back anyway on default.",
+  "queryParams": [
+    {
+      "purpose": "freetext",
+      "param": "query (JSON body field) — bare terms or \"quoted phrase\"",
+      "note": "Single Lucene-ish string that carries BOTH the free text AND all filters, ANDed together. MUST include collection:CREC or you get statutes/regs/court opinions. Verified: 'collection:CREC \"climate change\"' -> 9433. Phrase must be double-quoted; unquoted multi-words are OR-ish. No spaces around the colon (official rule). Field operators: govinfo.gov/help/search-operators."
+    },
+    {
+      "purpose": "date_from",
+      "param": "query: publishdate:range(YYYY-MM-DD,)",
+      "note": "Open-ended lower bound is documented and supported. There is NO separate top-level date param — the range goes inside the query string."
+    },
+    {
+      "purpose": "date_to",
+      "param": "query: publishdate:range(,YYYY-MM-DD)",
+      "note": "Open upper bound. Both bounds: publishdate:range(2026-01-01,2026-03-31) — VERIFIED to cut 9433 -> 19. publishdate maps to dateIssued (the sitting date), which is what you want for debates. Year-only form publishdate:range(2026,2026) also documented."
+    },
+    {
+      "purpose": "speaker",
+      "param": "query: member:<bioguideId or surname>",
+      "note": "VERIFIED with bioGuideId: member:B001291 -> 3869, member:S001226 -> 1066, bogus id -> 0. Official docs also show surname form (member:mcconnell) — surname is ambiguous across members, so prefer bioGuideId. The bioGuideId is the stable join key to api.congress.gov/v3/member/{bioguideId} if you need richer member data."
+    },
+    {
+      "purpose": "chamber",
+      "param": "derive from granuleId page prefix (recommended) — or query: granuleclass:HOUSE|SENATE (UNVERIFIED)",
+      "note": "SAFEST, zero-cost, verified: granuleId '…-pt1-PgH4667' -> H = House; '…-pt1-PgS4146-7' -> S = Senate; E = Extensions of Remarks; D = Daily Digest. Filter client-side on that letter. The /summary response also carries granuleClass:'HOUSE' and pagePrefix:'H' (observed). granuleclass: as a *search* operator is NOT in the official operator list and I could not test it — do not ship it untested. Documented-but-different alternative: the /published service takes docClass=HOUSE|SENATE|DIGEST|EXTENSIONS, but /published has no free-text search."
+    },
+    {
+      "purpose": "term",
+      "param": "query: congress:119 or congress:range(100,105)",
+      "note": "Documented on govinfo.gov/help/search-operators; my live test was eaten by the rate limit so treat as UNVERIFIED. Congress number is reliably present in the granule /summary response (congress:'119', observed) and inside members[]."
+    },
+    {
+      "purpose": "page",
+      "param": "offsetMark (JSON body)",
+      "note": "Cursor, not an integer offset. Send \"*\" for page 1; echo back the offsetMark from the previous response. See pagination."
+    },
+    {
+      "purpose": "size",
+      "param": "pageSize (JSON body)",
+      "note": "Docs sample uses 100. Verified working at 1, 2, 3."
+    }
+  ],
+  "pagination": "Opaque forward-only cursor. First request sends `\"offsetMark\": \"*\"`; the response returns a base64 `offsetMark` (observed e.g. `AoJw4LbZv58DPwxDUkVDLTIwMjYtMDctMjAtQ1JFQy0yMDI2LTA3LTIwLXB0MS1QZ0g0NjY3`) which you pass verbatim as `offsetMark` on the next POST, keeping `query`, `pageSize` and `sorts` IDENTICAL. `count` (observed 9433) is the total matching granules. Per GPO's own docs the cursor exists specifically to page beyond the 10,000-record ceiling that a numeric offset hits. Consequences for a Lambda: no random access, no jump-to-page-N, no parallel page fetches, and cursors are tied to the exact query — so deep pagination must be sequential and you should persist the cursor if you resume. `sorts` accepts field ∈ {score (DESC only), publishdate, lastModified, title} with sortOrder ASC|DESC. For incremental sync, sort by lastModified or use the separate GET /collections/CREC/{startDate} service.",
+  "fieldMapping": [
+    {
+      "normalized": "title",
+      "sourcePath": "results[].title (search) / .title (granule summary)",
+      "note": "VERIFIED. The debate/agenda-item heading, usually SHOUTING CASE: 'NEXT-GENERATION GEOTHERMAL RESEARCH AND DEVELOPMENT ACT', 'HONORING CASSY DORNBUSCH ON HER RETIREMENT'. Mixed case appears too ('Democrat Party Priorities (Executive Session)'). This is the topic, NOT the speaker — a granule can hold several speakers under one title."
+    },
+    {
+      "normalized": "speaker",
+      "sourcePath": "REQUIRES 2nd call: GET /packages/{packageId}/granules/{granuleId}/summary -> members[] filtered to role=='SPEAKING', then memberName (or name[0].authority-fnf / name[0].parsed)",
+      "note": "VERIFIED but this is the single biggest integration cost: the /search response contains NO speaker field at all (governmentAuthor is the useless constant ['Congress']). You must fan out one extra GET per hit -> N+1. members[] is an ARRAY (3 speakers on my sample granule), so a granule maps to MANY speakers, not one; decide whether a normalized row is per-granule or per-speaker. Three name forms observed: memberName 'Babin, Brian' (last-first), name[0].authority-fnf 'Brian Babin' (first-last, best for display), name[0].parsed 'Mr. BABIN' (the literal token as printed in the transcript — use this to locate that member's paragraphs inside the .htm text). Also carries role, state ('TX'), bioGuideId ('B001291'). Some granules (procedural, Daily Digest, inserted material) may have empty/absent members[] — guard for it."
+    },
+    {
+      "normalized": "party",
+      "sourcePath": "granule summary -> members[].party",
+      "note": "VERIFIED: 'R' (Babin), 'D' (Salinas), 'R' (Harrigan). Single-letter codes; expect 'I'/'ID' for independents. Only available via the 2nd /summary call — absent from search results. Pair with members[].state and members[].chamber for disambiguation."
+    },
+    {
+      "normalized": "date",
+      "sourcePath": "results[].dateIssued (search) / .dateIssued or .granuleDate (summary)",
+      "note": "VERIFIED. Plain ISO date, no time, no zone: '2026-07-20'. This is the actual sitting/proceedings date (GPO states dates reflect when proceedings occurred, not publication). Optional finer grain: summary.time = {from:'17:20:00', to:'17:30:00'} gives the floor time window. Do NOT use lastModified ('2026-07-22T07:53:43Z') or dateIngested ('2026-07-22') as the debate date."
+    },
+    {
+      "normalized": "chamber",
+      "sourcePath": "derive from granuleId page-prefix letter; confirm via summary.granuleClass / summary.pagePrefix / members[].chamber",
+      "note": "VERIFIED. 'CREC-2026-07-20-pt1-PgH4667' -> H -> House; 'CREC-2026-07-20-pt1-PgS4146-7' -> S -> Senate. E -> Extensions of Remarks, D -> Daily Digest. summary.granuleClass was 'HOUSE', pagePrefix 'H', members[].chamber 'H'. The regex on granuleId is free (no extra HTTP call) and is what I'd ship. Map D (Daily Digest) and arguably E to a non-floor bucket — Daily Digest is a summary/table-of-contents, not speech, and Extensions is inserted-not-spoken text."
+    },
+    {
+      "normalized": "term",
+      "sourcePath": "granule summary -> .congress (also members[].congress)",
+      "note": "VERIFIED: '119' (string, not int). NOT present in search results — needs the 2nd call, or infer from dateIssued (Congress N spans Jan of odd year 2N+1787 .. Jan two years later). members[].congress can theoretically differ from the granule's congress for historical member records, so prefer the top-level .congress."
+    },
+    {
+      "normalized": "sessionRef",
+      "sourcePath": "packageId + summary.bookNumber/pagePrefix; volume+issue from the .htm header line or api.congress.gov/v3/daily-congressional-record",
+      "note": "PARTIALLY VERIFIED — no clean single field. packageId 'CREC-2026-07-20' identifies the daily issue and is the best sessionRef. GovInfo does NOT return volumeNumber/issueNumber/sessionNumber in either the search or granule-summary JSON I saw (only bookNumber:'1', pagePrefix:'H'). The .htm first line does carry them: '[Congressional Record Volume 172, Number 118 (Monday, July 20, 2026)]' — parseable. Cleanest structured source is the OTHER API: api.congress.gov/v3/daily-congressional-record returns {congress:119, volumeNumber:172, issueNumber:'125', sessionNumber:2, issueDate} (VERIFIED) — join it on date if you need sessionNumber. Note a discrepancy I observed: govinfo's PDF path for 2026-07-20 implies volume 172 issue 118 while api.congress.gov's newest row is issue 125 for 2026-07-30 — consistent, but do not assume issue numbers align with anything but the date."
+    },
+    {
+      "normalized": "snippet",
+      "sourcePath": "NOT PROVIDED BY THE API — must be generated client-side from the fetched .htm text",
+      "note": "VERIFIED ABSENT. This is a real gap: the /search response has no highlight/snippet/summary/teaser field whatsoever (full observed key set per hit: title, packageId, granuleId, lastModified, governmentAuthor, dateIssued, collectionCode, dateIngested, download{premisLink,txtLink,zipLink,modsLink,pdfLink}, relatedLink, resultLink). To show why a hit matched you must download the granule text (3rd call) and locate the search term yourself. Budget for that: 32 KB for one granule, and granules can be far larger."
+    },
+    {
+      "normalized": "sourceUrl",
+      "sourcePath": "granule summary -> .detailsLink (citizen-facing) ; content text -> https://www.govinfo.gov/content/pkg/{packageId}/html/{granuleId}.htm",
+      "note": "VERIFIED both. detailsLink = 'https://www.govinfo.gov/app/details/CREC-2026-07-20/CREC-2026-07-20-pt1-PgH4667' — the human-readable landing page, use this for user-visible links. Do NOT surface the api.govinfo.gov download links to users: they require your api_key and would leak it. The www.govinfo.gov/content/... URL is keyless, deterministic from packageId+granuleId, and safe to expose."
+    },
+    {
+      "normalized": "docId",
+      "sourcePath": "results[].granuleId (primary key) ; results[].packageId (parent daily issue)",
+      "note": "VERIFIED. granuleId 'CREC-2026-07-20-pt1-PgH4667' is globally unique and stable — use it as your primary key. It usefully encodes date + part + chamber-prefix + starting page. packageId 'CREC-2026-07-20' is the parent issue (one per sitting day). Beware: the trailing segment can carry a suffix ('…-PgS4146-7' spans pages S4146-4147), so treat granuleId as an opaque string for identity and only regex it for the chamber letter."
+    },
+    {
+      "normalized": "language",
+      "sourcePath": "NOT RETURNED — hardcode 'en'",
+      "note": "No language field in search results or granule summary. The Congressional Record is English-only; occasional foreign-language quotations appear inline but are not tagged. MODS XML (modsLink) may include a languageTerm but I did not fetch it — do not rely on it. Hardcode 'en'."
+    }
+  ],
+  "fullTextAccess": "Three-hop pipeline; the search response gives you metadata only, never the words. Hop 1 POST /search -> granuleId + packageId. Hop 2 GET https://api.govinfo.gov/packages/{packageId}/granules/{granuleId}/summary?api_key=KEY -> speaker/party/congress/chamber. Hop 3 the verbatim text, two interchangeable routes: (a) KEYLESS and verified working — GET https://www.govinfo.gov/content/pkg/CREC-2026-07-20/html/CREC-2026-07-20-pt1-PgH4667.htm -> HTTP 200, 31995 bytes; or (b) keyed — the search response's download.txtLink, i.e. GET https://api.govinfo.gov/packages/{packageId}/granules/{granuleId}/htm?api_key=KEY (note the path segment is literally `htm` even though the field is named txtLink; I got 429 on this one so route (b) is UNVERIFIED, route (a) is verified). Payload shape is NOT clean HTML: it is a bare <html><head><title>Congressional Record, Volume 172 Issue 118 (Monday, July 20, 2026)</title></head><body><pre> wrapper around fixed-width ASCII, with the closing </pre></body></html> appearing BEFORE the opening <html> in the byte stream (malformed — do not feed to a strict XML parser; strip tags and treat as preformatted text). Structure inside: a bracketed header block ([Congressional Record Volume …] / [House] / [Pages H4667-H4670] / 'From the Congressional Record Online through the Government Publishing Office'), the title, then speech paragraphs each opening with the speaker token 'Mr. BABIN.' / 'Ms. SALINAS.' — split on that pattern and join to members[].name[0].parsed to attribute text per speaker. Warning: granules interleave genuine speech with non-speech (full quoted bill text — my 32 KB sample was mostly the text of H.R. 8790 — plus 'The Clerk read the title of the bill.' procedural lines); filter these out or your speech corpus is polluted with statute text. Also available per granule: /pdf (page images, layout-faithful), /mods (rich MODS XML metadata — likely the best single source for speaker+bill refs in one call, untested), /premis, and /zip for a whole day. Bulk alternative that avoids all per-item rate limits: the govinfo Bulk Data Repository / www.govinfo.gov/bulkdata (and the /published date-range service) for backfilling, then the search API for incremental queries.",
+  "languages": "English only. No language field is returned anywhere; hardcode 'en'. Coverage: daily Congressional Record volumes 140 (1994) to present, refreshed daily by ~11:00 ET (later if the chamber adjourns late) — per govinfo.gov/help/crec. Pre-1994 is NOT in CREC: the Bound Congressional Record is the separate CRECB collection (different editorial pass, different pagination, lags years behind), and 1789-1873 debates live outside govinfo entirely in the Library of Congress 'A Century of Lawmaking' (Annals of Congress / Register of Debates / Congressional Globe), which has no comparable API. The four sections of each issue: House (H pages), Senate (S), Extensions of Remarks (E — inserted/appended, NOT spoken), Daily Digest (D — a summary, not speech).",
+  "rateLimits": "Registered api.data.gov key: 36,000 requests/hour, 1,200/minute, 40/second (per GPO's usgpo/api README). DEMO_KEY: I observed `x-ratelimit-limit: 10` with `x-ratelimit-remaining: 0` and got locked out for the rest of the hour after ~10 calls — DEMO_KEY is unusable for anything real, and it is shared globally so other people's traffic burns your budget. Over-limit returns HTTP 429 `{\"error\":{\"code\":\"OVER_RATE_LIMIT\",\"message\":\"You have exceeded your rate limit…\"}}` — parse and back off rather than treating it as permanent failure. Every response carries x-ratelimit-limit / x-ratelimit-remaining, so self-throttle on those. The 40/sec ceiling matters because the 3-hop design multiplies calls: one 100-hit search page costs 1 + 100 + 100 = 201 requests, so a Lambda must cap concurrency (~20-30 in flight), batch, and cache /summary and .htm by granuleId (content is immutable once lastModified settles). Routing hop 3 to the keyless www.govinfo.gov/content/... path keeps roughly half the traffic off the metered key. ZIP/MODS may be generated on demand and answer HTTP 503 with `Retry-After: 30` — honour it.",
+  "gotchas": [
+    "WRONG-CANDIDATE TRAP (the main finding): api.congress.gov CANNOT do this. Its /congressional-record endpoint accepts ONLY format, offset, limit, y, m, d — confirmed from the Library of Congress's own openapi.json. There is no free-text param and no speaker param. Worse, it fails SILENTLY: I sent &q=climate and got back the identical latest-issues payload with HTTP 200, no error. Anyone testing casually would think it worked. What it returns is a list of daily issues with links to whole-issue PDFs — a table of contents, not searchable speech. Use GovInfo. (api.congress.gov is still useful for two narrow things: /daily-congressional-record for volume/issue/sessionNumber, and /member/{bioguideId} for member detail.)",
+    "SEARCH IS POST-ONLY. There is no GET form, so you cannot smoke-test it in a browser address bar, cannot cache it in a CDN by URL, and WebFetch-style tools can't hit it. Body must be JSON with Content-Type: application/json.",
+    "N+1 FAN-OUT IS UNAVOIDABLE — this is why the verdict is 'workable', not 'ready'. /search returns NO speaker, NO party, NO congress, NO chamber and NO snippet. Speaker+party require a /summary GET per hit; snippet requires an .htm GET per hit. A 100-result page = 201 HTTP calls. Design the Lambda around this from day one (concurrency cap, caching, possibly a pre-ingested store) or it will time out.",
+    "NO SNIPPET / NO HIGHLIGHTING ANYWHERE. The API will not tell you where or why the query matched. You must download the granule text and do your own term-locating and excerpting. There is no highlight, teaser, or summary field.",
+    "GRANULE != SPEECH. One granule is an agenda item that can contain MANY speakers (my sample had 3 in members[]) interleaved with non-speech. If your schema assumes one speaker per record you will mis-attribute. Decide explicitly: one row per granule (with a speaker array) or explode to one row per speaker.",
+    "SPEECH TEXT IS POLLUTED WITH STATUTE TEXT — directly relevant to the 'no statute text' scope rule. My 32 KB geothermal granule was mostly the verbatim text of H.R. 8790 quoted into the Record, plus procedural boilerplate ('The Clerk read the title of the bill.'). Naive extraction produces a corpus of bill text labelled as speech. Filter on the speaker-token pattern ('Mr. BABIN.') and drop indented quoted-bill blocks.",
+    "EXTENSIONS OF REMARKS (E pages) AND DAILY DIGEST (D pages) ARE NOT SPOKEN WORDS. GPO states House/Senate sections include 'words inserted or appended by Members' — i.e. even H and S granules can contain material never uttered on the floor, and the whole E section is inserted text. Daily Digest is an editorial summary. If you want only what was actually said, restrict to H/S and accept residual inserted material, or flag it.",
+    "THE .htm PAYLOAD IS MALFORMED HTML. The closing </pre></body></html> appears BEFORE the opening <html> in the byte stream. It is fixed-width ASCII inside a single <pre>. Strip tags and treat as preformatted text; a strict XML/DOM parser will throw or silently truncate.",
+    "download.txtLink is misleading — the field is named txtLink but the URL path segment is /htm and the payload is HTML-wrapped, not plain text.",
+    "resultLevel:'granule' is INVALID despite seeming natural: HTTP 400 {\"message\":\"valid values for resultLevel are package/default\"}. Just omit it — 'default' already returns granule-level hits for CREC.",
+    "OPAQUE FORWARD-ONLY CURSOR. offsetMark is a base64 blob, not an integer. No jump-to-page-N, no parallel page fetching, no random access. query/pageSize/sorts must stay byte-identical across the sequence. Deep pagination is strictly sequential — persist the cursor to resume. (The upside: it pages past the 10,000-record limit that numeric offsets hit.)",
+    "MUST include collection:CREC in every query. Omit it and GovInfo happily searches the CFR, US Code, bills and court opinions — you will silently ingest statute text instead of debates.",
+    "COLON SPACING IS STRICT: 'no spaces on either side of the :'. An invalid field name raises a Field Error. Also title:chesapeake bay only field-scopes the first word; use title:\"chesapeake bay\" or title:(a b) — same trap applies to any operator.",
+    "member: BY SURNAME IS AMBIGUOUS. Official docs show member:mcconnell, but surnames collide across chambers and eras. Use the bioGuideId form (member:B001291) which I verified discriminates correctly (3869 vs 1066 vs 0 for a bogus id).",
+    "granuleclass: AND congress: AS SEARCH OPERATORS ARE UNVERIFIED — I ran out of DEMO_KEY quota. congress: is in the official operator list; granuleclass: is NOT documented there at all. Do not ship a chamber filter that depends on granuleclass without testing it against a real key. Ship the granuleId page-prefix regex (H/S/E/D) instead — free, verified, and needs no extra call.",
+    "PARTY IS A BARE LETTER ('R','D') with no lookup table and no handling of independents/caucus affiliation, party switches mid-term, or vacancies. Normalize it yourself.",
+    "DATES: dateIssued is the sitting date and is what you want. lastModified ('2026-07-22T07:53:43Z') and dateIngested ('2026-07-22') are GovInfo bookkeeping and lag the debate by days — using them as the debate date silently shifts your timeline. Note publishdate (the search operator) maps to dateIssued (the response field): the names differ.",
+    "COVERAGE CLIFF AT 1994. CREC starts at volume 140 (1994). Pre-1994 needs the separate CRECB (Bound) collection, and pre-1873 is not on govinfo at all (Library of Congress 'A Century of Lawmaking', no API). Any UI implying full historical coverage will be wrong.",
+    "governmentAuthor is the constant ['Congress'] — it is NOT the speaker. Do not map it to the speaker field.",
+    "NEVER expose api.govinfo.gov download links to end users — they carry your api_key in the query string and would leak it. Use the keyless www.govinfo.gov/app/details/... (detailsLink) or /content/pkg/... URLs for anything user-visible.",
+    "TWO HOSTS MUST BE ALLOWLISTED, not one: api.govinfo.gov (search + metadata, keyed) AND www.govinfo.gov (keyless verbatim text + api-signup). A Lambda egress rule permitting only api.govinfo.gov will pass search and then fail at text retrieval. Key issuance/enforcement is api.data.gov's gateway, but you never call that host directly.",
+    "sorts field 'score' accepts DESC only — ASC is explicitly disallowed and will error.",
+    "Public-domain: GPO states there are no restrictions on republication of Congressional Record material (excepting copyrighted articles inserted into it), so no licensing blocker.",
+    "Bulk backfill option worth taking: govinfo.gov/bulkdata and the /published date-range service let you ingest years of CREC without burning per-item rate limits; reserve the search API for incremental/live queries."
+  ],
+  "confidence": "high"
+}

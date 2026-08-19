@@ -1,0 +1,176 @@
+{
+  "countryKey": "eu",
+  "displayName": "European Parliament",
+  "verdict": "ready",
+  "hasLiveQueryApi": true,
+  "sourceName": "European Parliament Open Data Portal — Open Data API v2, \"EP SPEECHES\" endpoint (plenary debate speeches, backed by CRE verbatim reports)",
+  "hosts": [
+    "data.europarl.europa.eu",
+    "www.europarl.europa.eu"
+  ],
+  "protocol": "REST + JSON-LD (OpenAPI 3.0.3). Content negotiation via `Accept` header OR `format` query param. Alternative serializations: application/rdf+xml, text/turtle. NOT OData, NOT SPARQL (a separate SPARQL endpoint exists but is not needed). The OpenAPI spec is served directly at GET https://data.europarl.europa.eu/api/v2/ (returns the raw openapi.json, 55 paths).",
+  "auth": "NONE. No API key, no token, no registration, no OAuth. Verified: a request with no headers at all returned HTTP 200. The spec defines an OPTIONAL `User-Agent` request header parameter with suggested format `{user-id}-{environment}-{version}` (e.g. `parlamentgpt-prd-1.0.0`); it is \"strongly recommended\" for platform monitoring but is not enforced. Note the spec explicitly warns not to put personal data (names/emails) in the User-Agent per Regulation (EU) 2018/1725. License: CC BY 4.0 (attribution required).",
+  "searchEndpoint": "GET /api/v2/speeches  (single-record detail: GET /api/v2/speeches/{speech-id})",
+  "exampleRequest": "https://data.europarl.europa.eu/api/v2/speeches?text=Ukraine&activity-type=PLENARY_DEBATE_SPEECH&sitting-date=2024-12-01&sitting-date-end=2024-12-31&search-language=en&language=en&include-output=xml_fragment&sort-by=sitting-date%3Adesc&limit=5&offset=0&format=application%2Fld%2Bjson",
+  "verified": true,
+  "verificationNote": "Fully executed via curl, multiple times. (1) GET https://data.europarl.europa.eu/api/v2/ -> HTTP 200, returned the literal OpenAPI 3.0.3 document, title \"European Parliament Open Data API\", server url https://data.europarl.europa.eu/api/v2, tag \"EP SPEECHES\" with paths /speeches and /speeches/{speech-id}. (2) The exampleRequest above -> HTTP 200, meta.total=113, 5 records. Real observed values from the first hit: id=\"eli/dl/event/MTG-PL-2024-12-18-OTH-2017008949668\", activity_date=\"2024-12-18\", activity_start_date=\"2024-12-18T09:49:24+01:00\", activity_label.en=\"Preparation of the European Council of 19-20 December 2024 (debate)\", had_activity_type=\"def/ep-activities/PLENARY_DEBATE_SPEECH\", had_participation.had_participant_person=[\"person/103381\"], had_participation.participation_in_name_of=\"org/VERTS_ALE\", had_participation.participation_role=\"def/ep-roles/SPEAKER\", recorded_in_a_realization_of[0].identifier=\"CRE-10-2024-12-18-OTH-2017008949668\", .is_part_of=\"eli/dl/doc/CRE-10-2024-12-18-ITM-006\", .notation_speechId=\"2017008949668\", .numbering=19, .number=\"3-0026-0000\", .originalLanguage=[\"http://publications.europa.eu/resource/authority/language/ENG\"]. (3) FULL SPEECH TEXT CONFIRMED: with include-output=xml_fragment, recorded_in_a_realization_of[0][\"api:xmlFragment\"] contained the complete verbatim speech in all 24 EU languages (keys bg,cs,da,de,el,en,es,et,fi,fr,ga,hr,hu,it,lt,lv,mt,nl,pl,pt,ro,sk,sl,sv). Literal observed EN text opening: '<oralStatements><speech endTime=\"2024-12-18T09:40:43\" startTime=\"2024-12-18T09:36:21\"><from xml:lang=\"es-t-en-mtec\"...><person refersTo=\"epdata:person/28298\">Iratxe García Pérez</person>, <role>on behalf of the Group <organization refersTo=\"epdata:org/7038\">S&amp;D</organization></role></from><blockContainer><p xml:space=\"preserve\">Madam President, Madam President von der Leyen, last week I had the opportunity to travel to Ukraine for the second time...' (~1800+ chars of real floor speech, multi-paragraph). (4) include-output=highlighted_text -> HTTP 200, snippets land at searchResults.hits[i].highlights.xml_text with matches wrapped in <inline name=\"highlight\">Ukraine</inline>. (5) person-id=28298 filter -> HTTP 200 meta.total=161. (6) parliamentary-term=10 -> meta.total=10000 (capped). (7) GET /api/v2/meps/28298 -> HTTP 200, label=\"Iratxe GARCÍA PÉREZ\", hasMembership[] with organization/role/memberDuring.startDate/endDate. (8) GET /api/v2/documents/CRE-10-2024-12-18-ITM-006 -> HTTP 200, title_dcterms.en = debate title, is_part_of=\"eli/dl/doc/CRE-10-2024-12-18\". (9) Coverage probes: 2019-01, 2019-07, 2020-01, 2020-07, 2021-01..2021-06 all returned HTTP 204 No Content; 2021-07 onward returned data. Earliest record with parliamentary-term=9 sorted sitting-date:asc = 2021-07-05. Latest with sort sitting-date:desc = 2026-07-09. Monthly totals observed: 2021-07=898, 2022-01=452, 2022-07=1100, 2023-01=1143, 2023-07=1182, 2024-01=1239. (10) Pagination boundary: offset=9950 -> HTTP 200; offset=10000 -> HTTP 404. (11) Rate limiting is real: I tripled a burst of ~10 rapid requests and got a run of curl exit-000 (connection dropped, no HTTP status) that self-healed after ~40-60s sleep.",
+  "queryParams": [
+    {
+      "purpose": "freetext",
+      "param": "text",
+      "note": "Free-text search in the CONTENT (body) of the speech. This is the main one. Verified: text=Ukraine over Dec 2024 -> meta.total=113. Pair with search-language."
+    },
+    {
+      "purpose": "freetext",
+      "param": "title",
+      "note": "Free-text search restricted to the debate/agenda-item TITLE only (e.g. 'Preparation of the European Council...'). Use in addition to `text`, not instead of it."
+    },
+    {
+      "purpose": "date_from",
+      "param": "sitting-date",
+      "note": "Plenary sitting date, RANGE START. Format YYYY-MM-DD. GOTCHA: if you pass sitting-date WITHOUT sitting-date-end, the range collapses to that single day."
+    },
+    {
+      "purpose": "date_to",
+      "param": "sitting-date-end",
+      "note": "Range end, YYYY-MM-DD, inclusive (verified 2024-12-01..2024-12-31 returned 2024-12-18 records)."
+    },
+    {
+      "purpose": "speaker",
+      "param": "person-id",
+      "note": "Numeric EP person ID, array/repeatable, comma-separated (explode=false). NOT a name string. Verified person-id=28298 -> total 161. You must resolve name -> id first via GET /api/v2/meps?... or /api/v2/meps/show-current."
+    },
+    {
+      "purpose": "term",
+      "param": "parliamentary-term",
+      "note": "Integer, enum is ONLY [10, 9] per the spec ('Parliamentary Term limited to the 10th'). Term 10 = 2024-, term 9 = 2019-2024 (but speech data only starts 2021-07). Verified parliamentary-term=10 -> total 10000."
+    },
+    {
+      "purpose": "chamber",
+      "param": "activity-type",
+      "note": "No chamber param exists (EP is unicameral). Use this instead to isolate real floor speech: PLENARY_DEBATE_SPEECH. Other enum values: PROCEEDING_ACTIVITY, PLENARY_DEBATE_WRITTEN_STATEMENT, MEETING_NAME_CHAIR. ALWAYS SET activity-type=PLENARY_DEBATE_SPEECH or you get written statements and procedural noise mixed in."
+    },
+    {
+      "purpose": "page",
+      "param": "offset",
+      "note": "Zero-based row offset. Default 0. Hard ceiling: offset must be < 10000 (offset=10000 -> HTTP 404)."
+    },
+    {
+      "purpose": "size",
+      "param": "limit",
+      "note": "Rows per page. Default 50. limit=100 and limit=1000 both returned HTTP 200, so the ceiling is above 50 despite the spec naming the param schema 'limit50'."
+    },
+    {
+      "purpose": "freetext",
+      "param": "search-language",
+      "note": "ISO 639-1 language the free-text `text`/`title` query is matched against. Defaults to `en` if omitted. Distinct from `language`."
+    },
+    {
+      "purpose": "freetext",
+      "param": "language",
+      "note": "Language of the RETURNED resource. Filters activity_label and api:xmlFragment down to that one language. Verified: language=en collapsed the 24-language label/fragment maps to a single 'en' key. STRONGLY RECOMMENDED — omitting it returns all 24 languages and inflates payloads ~11x (9.7KB -> 111KB for one record)."
+    },
+    {
+      "purpose": "freetext",
+      "param": "include-output",
+      "note": "Comma-separated (explode=false), enum {xml_fragment, highlighted_text}. xml_fragment = full speech text. highlighted_text = search snippets. GOTCHA: repeating the param (include-output=a&include-output=b) silently drops one; you MUST comma-join: include-output=xml_fragment,highlighted_text."
+    },
+    {
+      "purpose": "freetext",
+      "param": "sort-by",
+      "note": "Format {parameter}:{order}. Allowed params: sitting-date, number, numbering, video-start-time, search-score. Orders: asc, desc. Default search-score:desc. URL-encode the colon as %3A to be safe."
+    },
+    {
+      "purpose": "freetext",
+      "param": "format",
+      "note": "Response serialization: application/ld+json (default), application/rdf+xml, text/turtle. Alternative to the Accept header."
+    },
+    {
+      "purpose": "freetext",
+      "param": "video-start-time / video-end-time",
+      "note": "ISO 8601 timestamp range against the plenary VIDEO timeline, e.g. 2024-05-08T11:04:03.399+02:00. Useful for deep-linking speech -> video, not for text search."
+    }
+  ],
+  "pagination": "Classic offset/limit. `limit` (default 50; 100 and 1000 both accepted) + `offset` (default 0). Total match count is returned as `meta.total` (integer) at the top level of the JSON-LD envelope — verified values 113, 161, 751, 1187. There is also an `x-total-count` response header, but observed value was the page size (1), not the total, so DO NOT rely on it — use `meta.total`. No cursor, no next/prev links.\n\nHARD CEILING: offset must be strictly < 10000. offset=9950 -> HTTP 200; offset=10000 and offset=10050 -> HTTP 404. Correspondingly meta.total saturates at exactly 10000 for broad queries (parliamentary-term=10 alone reported total=10000, and sorting asc vs desc returned genuinely different first records, confirming 10000 is a clamp, not the real count). Consequence for a Lambda: you can never page past 10k results for a single query. Mitigation — shard the crawl by narrow `sitting-date`/`sitting-date-end` windows (a single month of PLENARY_DEBATE_SPEECH is ~450-1250 records, comfortably under the cap) and paginate within each window.\n\nEmpty result set returns HTTP 204 No Content with a ZERO-LENGTH BODY, not a 200 with an empty data array. Your client MUST check for 204 before attempting json.loads() or it will throw.",
+  "fieldMapping": [
+    {
+      "normalized": "title",
+      "sourcePath": "data[i].activity_label[lang]",
+      "note": "Language-keyed map, e.g. activity_label.en = 'Preparation of the European Council of 19-20 December 2024 (debate)'. This is the DEBATE/agenda-item title, shared by every speech in that debate — it is NOT a per-speech headline. Pass language=en to collapse the map to a single key; otherwise you get all 24 EU languages."
+    },
+    {
+      "normalized": "speaker",
+      "sourcePath": "data[i].had_participation.had_participant_person[0]  ->  resolve via GET /api/v2/meps/{id}.data[0].label",
+      "note": "TWO-STEP. The speeches payload gives only an opaque ref like 'person/103381' — NO NAME. Strip the 'person/' prefix and call /api/v2/meps/28298, whose data[0].label is the display name (verified: 'Iratxe GARCIA PEREZ'). CHEAP SHORTCUT: the api:xmlFragment begins with <from><person refersTo=\"epdata:person/28298\">Iratxe Garcia Perez</person>, so when you already request xml_fragment you can parse the name out of the fragment and skip the extra HTTP call entirely. Build a person-id -> name cache; the same MEPs recur constantly. Also check had_participation.participation_role == 'def/ep-roles/SPEAKER' (observed on 50/50 sampled records)."
+    },
+    {
+      "normalized": "party",
+      "sourcePath": "data[i].had_participation.participation_in_name_of",
+      "note": "PARTIALLY POPULATED — THIS IS THE BIGGEST DATA-QUALITY TRAP. Observed values are political-group slugs: 'org/VERTS_ALE', 'org/S_D', 'org/PFE', 'org/ESN', 'org/RENEW'. In a 50-record sample this field was NULL/ABSENT on 38 of 50 records (76%), because it only appears when the MEP spoke *formally on behalf of* their group rather than in a personal capacity. FALLBACKS, in order: (1) parse the group from the api:xmlFragment <from> line, where the group appears inline for most speakers even when participation_in_name_of is null — verified 'Nicola Zingaretti (S&D)' and 'Carlo Fidanza (ECR)' both had participation_in_name_of == null; (2) derive from the MEP record: GET /api/v2/meps/{id}.data[0].hasMembership[], pick the entry whose membershipClassification == 'def/ep-entities/EU_POLITICAL_GROUP' and whose memberDuring.startDate/endDate bracket the speech date. Note hasMembership also carries NATIONAL_POLITICAL_GROUP (national party) and represents=[country URI], so you can populate national party and country too. Human-readable group labels come from GET /api/v2/corporate-bodies?body-classification=EU_POLITICAL_GROUP, whose items look like {id:'org/2953', label:'S&D'} — WARNING: those numeric org ids do NOT match the slug form ('org/S_D', 'org/7038') seen in speeches, so slug->label needs a hand-maintained lookup table."
+    },
+    {
+      "normalized": "date",
+      "sourcePath": "data[i].activity_date  (plus data[i].activity_start_date / activity_end_date)",
+      "note": "activity_date is the plain sitting date 'YYYY-MM-DD' (e.g. '2024-12-18') — use this for the normalized date. activity_start_date / activity_end_date are full ISO 8601 offset timestamps for the individual speech ('2024-12-18T09:36:21+01:00' -> '2024-12-18T09:40:43+01:00'), which additionally give you speech duration."
+    },
+    {
+      "normalized": "chamber",
+      "sourcePath": "CONSTANT — hardcode 'European Parliament' / 'Plenary'",
+      "note": "No chamber field exists; the EP is unicameral and this endpoint is plenary-only. You can corroborate from the id prefix 'MTG-PL-' (PL = plenary) and from had_activity_type == 'def/ep-activities/PLENARY_DEBATE_SPEECH'."
+    },
+    {
+      "normalized": "term",
+      "sourcePath": "Parse from data[i].recorded_in_a_realization_of[0].identifier, segment 2",
+      "note": "Not exposed as its own field in the response, only as a REQUEST filter. Derive it: identifier 'CRE-10-2024-12-18-OTH-2017008949668' -> '10' is the parliamentary term. Same in the is_part_of value 'eli/dl/doc/CRE-10-2024-12-18-ITM-006'. Regex: /^CRE-(\\d+)-/."
+    },
+    {
+      "normalized": "sessionRef",
+      "sourcePath": "data[i].recorded_in_a_realization_of[0].is_part_of  (and data[i].inverse_consists_of[0])",
+      "note": "is_part_of = 'eli/dl/doc/CRE-10-2024-12-18-ITM-006' — the CRE verbatim-report agenda ITEM this speech belongs to; the ideal sessionRef for grouping a debate. The parent whole-day report is 'eli/dl/doc/CRE-10-2024-12-18' (verified via GET /api/v2/documents/CRE-10-2024-12-18-ITM-006, whose is_part_of returns it). inverse_consists_of = ['eli/dl/event/MTG-PL-2024-12-18-PVCRE-ITM-8'] links to the sitting-event. Ordering within the debate: recorded_in_a_realization_of[0].numbering (integer, e.g. 15, 19, 23) and .number (e.g. '3-0026-0000')."
+    },
+    {
+      "normalized": "snippet",
+      "sourcePath": "searchResults.hits[i].highlights.xml_text  (request include-output=highlighted_text)",
+      "note": "IMPORTANT STRUCTURAL GOTCHA: highlights are NOT inside data[] — they live in the PARALLEL top-level array searchResults.hits[], joined to data[] by the `id` value ('eli/dl/event/MTG-PL-...'). Do NOT assume positional alignment; join on id. Matched terms are wrapped as <inline name=\"highlight\">Ukraine</inline> (verified literal markup). Strip tags for a plain snippet, or convert <inline name=\"highlight\"> to <mark>. Note searchResults.hits[] is present even without include-output, but then each hit contains only {id}."
+    },
+    {
+      "normalized": "sourceUrl",
+      "sourcePath": "CONSTRUCT from recorded_in_a_realization_of[0].is_part_of",
+      "note": "Not returned by the API. Build the public human-readable verbatim-report page: https://www.europarl.europa.eu/doceo/document/{ITEM_ID}_{LANG}.html — e.g. https://www.europarl.europa.eu/doceo/document/CRE-10-2024-12-18-ITM-006_EN.html (take is_part_of 'eli/dl/doc/CRE-10-2024-12-18-ITM-006', drop the 'eli/dl/doc/' prefix, uppercase the lang). Whole-day report: .../CRE-10-2024-12-18_EN.html. CAVEAT: my curl to both doceo URLs returned HTTP 202 (bot-mitigation interstitial), not 200, so the pattern is CONSTRUCTED-AND-CONVENTIONAL but NOT content-verified by me — treat it as a display link, never as a fetch target for text. Machine-readable canonical URI: https://data.europarl.europa.eu/eli/dl/event/{activity_id}."
+    },
+    {
+      "normalized": "docId",
+      "sourcePath": "data[i].activity_id  (primary)  /  recorded_in_a_realization_of[0].identifier  (document-side)  /  notation_speechId (short)",
+      "note": "Three usable ids for one speech, all verified on the same record: activity_id = 'MTG-PL-2024-12-18-OTH-2017008949668' (this is the value accepted by GET /api/v2/speeches/{speech-id} — verified HTTP 200); data[i].id = 'eli/dl/event/MTG-PL-2024-12-18-OTH-2017008949668' (full ELI ref, same string prefixed); recorded_in_a_realization_of[0].identifier = 'CRE-10-2024-12-18-OTH-2017008949668' (the CRE document-subdivision id); notation_speechId = '2017008949668' (bare numeric tail). RECOMMENDATION: store activity_id as the primary key since it is the round-trippable lookup key."
+    },
+    {
+      "normalized": "language",
+      "sourcePath": "data[i].recorded_in_a_realization_of[0].originalLanguage[0]  (original spoken)  vs. the key of api:xmlFragment (delivered translation)",
+      "note": "TWO DISTINCT NOTIONS, do not conflate. originalLanguage is an EU Publications Office authority URI with a 3-letter code — observed 'http://publications.europa.eu/resource/authority/language/ENG', '.../SPA', '.../ITA' — and tells you the language the MEP ACTUALLY SPOKE (map ENG->en, SPA->es, ITA->it). The api:xmlFragment map key (bg..sv, ISO 639-1) tells you which TRANSLATION you are reading. Extra tell: the fragment's <from xml:lang=\"es-t-en-mtec\"> BCP-47 tag encodes source->target plus '-mtec', i.e. MACHINE TRANSLATION — so non-original-language text is often MT, not a human interpreter's words. Store both: language_original and language_retrieved."
+    }
+  ],
+  "fullTextAccess": "YES — complete verbatim speech text is retrievable inline from the same /speeches search call, no second request and no PDF scraping. Add `include-output=xml_fragment` and read `data[i].recorded_in_a_realization_of[0][\"api:xmlFragment\"][lang]`.\n\nThe payload is an XML string in Akoma-Ntoso-like markup: `<oralStatements><speech startTime=\"..\" endTime=\"..\"><from><person refersTo=\"epdata:person/28298\">Iratxe Garcia Perez</person>, <role>on behalf of the Group <organization refersTo=\"epdata:org/7038\">S&D</organization></role></from><blockContainer><p xml:space=\"preserve\">Madam President, ... </p><p>...</p></blockContainer></speech></oralStatements>`. Strip tags (or parse <p> nodes) to get clean paragraphs; the <from> block conveniently yields speaker name + group, which lets you skip the /meps lookup. I verified a full multi-paragraph, ~1800+ character real floor speech this way.\n\nAvailable in all 24 official EU languages per speech (verified: 24 keys on a single record). Pass `language=en` to fetch just one and cut the payload roughly 11x (111KB -> 9.7KB for one record). CRITICAL CAVEAT: only ONE of those 24 is the genuine spoken original — identified by recorded_in_a_realization_of[0].originalLanguage (e.g. .../SPA). The other 23 carry xml:lang tags like \"es-t-en-mtec\", where \"-mtec\" marks MACHINE TRANSLATION. So \"what the member actually said\" in their own words = the originalLanguage variant; the English text for a Spanish speech is MT, not a human interpreter transcript. For a \"what did they actually say\" product, store the original and clearly label the English as machine-translated.\n\nSnippets/highlighting: `include-output=highlighted_text` puts search-term-marked text at searchResults.hits[i].highlights.xml_text with matches wrapped in <inline name=\"highlight\">…</inline>. You can request both outputs in one call, but ONLY comma-joined: include-output=xml_fragment,highlighted_text.",
+  "languages": "All 24 official EU languages for both search and retrieval: bg, cs, da, de, el, en, es, et, fi, fr, ga, hr, hu, it, lt, lv, mt, nl, pl, pt, ro, sk, sl, sv (verified as the exact key set of api:xmlFragment on a single speech record), plus `mul` for multilingual resources on the `language` filter. Two separate knobs: `search-language` (which language index the free-text query runs against, defaults to `en`) and `language` (which language the response content is returned in). Original spoken language per speech is exposed via originalLanguage as a 3-letter EU authority URI (ENG/SPA/ITA/DEU observed); all other language variants are machine translation (xml:lang suffix \"-mtec\").",
+  "rateLimits": "Documented in the OpenAPI info.description (verified verbatim): \"Open Data API limits the number of requests to be made at the same end point for security reasons. Maximum number of requests 500 in 5min.\" That is per-endpoint, i.e. ~1.67 req/s sustained against /speeches.\n\nOBSERVED BEHAVIOUR IS HARSHER AND UGLIER THAN THAT NUMBER SUGGESTS, and this is the single biggest Lambda risk here. Bursting roughly 10 requests in a few seconds (well under 500/5min) repeatedly caused the connection to be DROPPED with no HTTP response at all — curl exit code 000, empty body, no 429, no Retry-After header. It self-healed after a 40-60 second pause. There is an AWS ALB in front (AWSALB cookies, server: nginx), so this looks like a connection-level throttle rather than a clean application-layer 429.\n\nImplementation requirements: (1) treat an empty/zero-length response or connection reset as a throttle signal, not a data error; (2) exponential backoff starting around 30-60s; (3) insert a deliberate 3-6s delay between sequential calls — with that pacing I saw zero failures; (4) never fire parallel fan-out requests at this host; (5) set a descriptive User-Agent (e.g. parlamentgpt-prd-1.0.0) since the operators use it for reuser monitoring and it may help you avoid being lumped in with anonymous traffic. License CC BY 4.0 — attribute the European Parliament.",
+  "gotchas": [
+    "COVERAGE FLOOR ~JULY 2021 — the hard blocker for historical work. Verified: 2019-01, 2019-07, 2020-01, 2020-07 and the whole of 2021-01..2021-06 all return HTTP 204 No Content for PLENARY_DEBATE_SPEECH. Earliest record found (parliamentary-term=9, sort sitting-date:asc) is 2021-07-05. So even though the spec offers parliamentary-term=9 (the 2019-2024 term), the first two years of that term have NO speech data in this API. Latest observed record: 2026-07-09. Monthly volumes: 2021-07=898, 2022-01=452, 2022-07=1100, 2023-01=1143, 2023-07=1182, 2024-01=1239. Pre-2021 debates exist only as CRE HTML/PDF on www.europarl.europa.eu/doceo and would need scraping.",
+    "EMPTY RESULTS ARE HTTP 204 WITH A ZERO-BYTE BODY, not 200 with data:[]. json.loads() on that throws. Check status == 204 first. This will crash a naive Lambda on the very first query that happens to match nothing.",
+    "WITHOUT AN ACCEPT HEADER YOU SILENTLY GET RDF/XML, NOT JSON. Verified: the identical URL returned '<?xml version=\"1.0\"?><rdf:RDF ...' (9739 bytes) with no Accept header, and JSON-LD (6061 bytes) with 'Accept: application/ld+json'. Always send Accept: application/ld+json AND/OR format=application%2Fld%2Bjson. Belt and braces.",
+    "OFFSET IS CAPPED AT 10000 AND meta.total SATURATES AT 10000. offset=9950 -> 200, offset=10000 -> 404. Broad queries report total=10000 regardless of the true count. You CANNOT deep-paginate a whole term in one query. Shard by month via sitting-date/sitting-date-end (~450-1250 records/month, safely under the cap).",
+    "`sitting-date` ALONE MEANS ONE SINGLE DAY, not 'everything from this date onward'. The spec states: 'if only sitting-date is selected, the range will be limited to the same day.' Forgetting sitting-date-end will silently return ~1/30th of the data you expected — a classic silent-undercount bug.",
+    "party/political group IS NULL ~76% OF THE TIME. had_participation.participation_in_name_of was absent on 38 of 50 sampled records, because it is only set when the MEP spoke formally on behalf of their group. Verified counterexamples where it was null yet the group was known: 'Nicola Zingaretti (S&D)', 'Carlo Fidanza (ECR)' (group present inline in api:xmlFragment). If you map party straight from this field you will show 'unknown party' on three quarters of your results. Fall back to parsing the xmlFragment <from> line, or to /meps/{id}.hasMembership[] filtered on membershipClassification == 'def/ep-entities/EU_POLITICAL_GROUP' with memberDuring bracketing the speech date.",
+    "SPEAKER NAME IS NOT IN THE SPEECHES RESPONSE — only 'person/103381'. Requires a second call to /api/v2/meps/{id} (data[0].label), or parse it from api:xmlFragment's <from><person> element (free, no extra request, strongly preferred). Cache person-id -> name aggressively; the same MEPs dominate.",
+    "23 OF THE 24 LANGUAGE VARIANTS ARE MACHINE TRANSLATION. The xml:lang attribute reads e.g. 'es-t-en-mtec' — '-mtec' = machine translation. Only the variant matching recorded_in_a_realization_of[0].originalLanguage (e.g. .../SPA) is what the member genuinely said. For a Hansard-fidelity product this matters a lot: do not present MT English as a verbatim quote without labelling it.",
+    "include-output MUST BE COMMA-JOINED, NOT REPEATED. 'include-output=xml_fragment&include-output=highlighted_text' silently drops one (I observed xmlFragment present but highlights missing). Correct: 'include-output=xml_fragment,highlighted_text' (the spec sets explode:false). Same applies to activity-type, person-id, parliamentary-term, sort-by, body-classification.",
+    "HIGHLIGHTS LIVE IN A PARALLEL ARRAY, NOT IN data[]. They are at searchResults.hits[i].highlights.xml_text and must be JOINED TO data[] BY THE `id` FIELD. Do not rely on positional alignment. Also note searchResults.hits[] always exists but contains only {id} unless you ask for highlighted_text.",
+    "DEFAULT SORT IS RELEVANCE (search-score:desc), NOT CHRONOLOGICAL. For stable incremental ingestion always set sort-by=sitting-date%3Adesc (or :asc). URL-encode the colon as %3A — I hit ambiguous failures with a raw ':' that cleared once encoded.",
+    "ALWAYS SET activity-type=PLENARY_DEBATE_SPEECH. /speeches is a grab-bag: without the filter you also get PLENARY_DEBATE_WRITTEN_STATEMENT (never spoken aloud — out of scope for a 'what they said on the floor' product), PROCEEDING_ACTIVITY, and MEETING_NAME_CHAIR.",
+    "activity_label IS THE DEBATE TITLE, SHARED ACROSS EVERY SPEECH IN THAT DEBATE — it is not a per-speech title. Dozens of records will carry the identical 'Preparation of the European Council of 19-20 December 2024 (debate)'. Deduping or titling UI on this field alone will look broken; use speaker + numbering to disambiguate.",
+    "x-total-count RESPONSE HEADER IS MISLEADING. Observed x-total-count: 1 on a query whose meta.total was 10000 — it reflects the page size. Use meta.total.",
+    "www.europarl.europa.eu/doceo (the human-readable CRE page you would use for sourceUrl) RETURNED HTTP 202 to my curl, i.e. a bot-mitigation interstitial rather than content. The doceo URL pattern is UNVERIFIED as a fetchable resource. Use it as a display-only outbound link; never make your pipeline depend on fetching text from it (you do not need to — xml_fragment already has the full text).",
+    "The /speeches/{speech-id} detail route takes the BARE activity_id ('MTG-PL-2024-12-18-OTH-2017008949660'), NOT the 'eli/dl/event/...' prefixed data[i].id. Verified 200 with the bare form.",
+    "OEIL (oeil.secure.europarl.europa.eu) is the Legislative Observatory web app and is NOT a debates API — correctly ignored per instructions. Likewise /adopted-texts, /plenary-documents, /procedures are statute/bill-tracker style resources, and /meetings/{sitting-id}/vote-results is voting records — all out of scope for debates. /speeches is the correct and only debates endpoint.",
+    "Political-group identifier schemes are INCONSISTENT ACROSS ENDPOINTS. Speeches use slugs ('org/S_D', 'org/VERTS_ALE', 'org/RENEW', 'org/PFE', 'org/ESN') and internal numeric refs in the xmlFragment ('epdata:org/7038'), while /corporate-bodies?body-classification=EU_POLITICAL_GROUP returns different numeric ids with labels ({id:'org/2953', label:'S&D'}). GET /api/v2/corporate-bodies/S_D returns 404 (the path pattern is ^[A-Z0-9-]+$, so underscored slugs are not even valid there). You will need a small hand-maintained slug -> display-name table for the ~8 current groups."
+  ],
+  "confidence": "high"
+}

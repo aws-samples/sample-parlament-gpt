@@ -1,0 +1,164 @@
+{
+  "countryKey": "ca",
+  "displayName": "Canada — House of Commons (Debates / Hansard)",
+  "verdict": "workable",
+  "hasLiveQueryApi": true,
+  "sourceName": "House of Commons of Canada — Publication Search (PubType=37 \"Hansard\"), official XML output; documented on ourcommons.ca Open Data. Full-sitting verbatim reports also at /Content/House/{parlsession}/Debates/{sitting}/HAN{sitting}-{E|F}.XML",
+  "hosts": [
+    "www.ourcommons.ca"
+  ],
+  "protocol": "HTTP GET returning XML (not REST/OData/JSON). It is the HTML search UI's own backend with `xml=1` appended — officially documented on the Open Data page, but the response is a UI-shaped `<Results>` document (results + refiner facets), not a designed API contract. No JSON variant exists. Optional companion: static per-sitting Hansard XML files over plain HTTP GET.",
+  "auth": "none — fully open, no API key, no token, no registration, no cookie required. Verified with bare curl (no headers) returning HTTP 200 + text/xml.",
+  "searchEndpoint": "/PublicationSearch/{en|fr}/?PubType=37&...&xml=1  (canonical host www.ourcommons.ca; the older documented form /Parliamentarians/en/PublicationSearch?... 302-redirects to /publicationsearch/en/)",
+  "exampleRequest": "https://www.ourcommons.ca/PublicationSearch/en/?PubType=37&Text=%22carbon%20tax%22&ParlSes=From2026-06-01To2026-06-18&xml=1",
+  "verified": true,
+  "verificationNote": "Executed live via curl (sandbox allowed egress to www.ourcommons.ca). The literal exampleRequest above returned HTTP 200, content-type `text/xml; charset=utf-8`, 288,327 bytes, root element `<Results RecordsFound=\"45\" PubType=\"37\" RefinerPage=\"1\"><TextToHighlight>carbon tax</TextToHighlight>`, with 45 `<PublicationItem>` elements. Real observed values from a returned item: PublicationItem Id=\"14204437\" EventId=\"13593058\" Date=\"2026-06-18\" Hour=\"14\" Minute=\"38\" Page=\"9593\" PdfPage=\"41\"; Person Id=\"25524\" FirstName=Pierre LastName=Poilievre Honorific=\"Hon.\" Constituency=\"Battle River—Crowfoot\" Caucus Abbr=\"CPC\" Province Code=\"AB\"; OrderOfBusiness=\"Oral Question Period\"; SubjectOfBusiness=\"The Economy\"; EventType=\"Intervention\"; XmlContent/Intervention Type=\"Debate\" id=\"13593058\"; Affiliation DbId=\"322132\" = \"Hon. Pierre Poilievre (Leader of the Opposition, CPC)\"; ParaText id=\"9423654\" containing the verbatim speech text; IndexEntries Terms \"Economic policy\", \"Oral questions\", \"Technical recession\". Parent Publication: Id=\"14204756\" Title=\"Hansard - 139\" Parliament=\"45\" Session=\"1\" Date=\"2026-06-18\" PdfURL=\"/Content/House/451/Debates/139/HAN139-E.PDF\". Also verified: unfiltered Hansard query reports RecordsFound=\"46377\"; speaker filter Per=25524 returned 89 items, all 89 confirmed to be Pierre Poilievre (Counter over parsed Person nodes); Cauc=8781 returned only Caucus Abbr=\"CPC\" items; French locale /fr/ returned Organization=\"Chambre des communes\" and PdfURL .../HAN139-F.PDF; raw per-sitting file https://www.ourcommons.ca/Content/House/451/Debates/139/HAN139-E.XML returned 200 text/xml 415,035 bytes with `<Hansard xml:lang=\"EN\" id=\"13591479\">` and ExtractedItems (Volume 152, No. 139, 1st SESSION, 45th PARLIAMENT, Thursday, June 18, 2026, Speaker: The Honourable Francis Scarpaleggia); 44th-Parliament equivalent HAN100-E.XML also 200 (682,186 bytes). CONFIRMED DEFECT: `Page` is silently ignored in xml=1 mode — pages 1, 2 and 3 of the same query all returned byte-identical documents (md5 70dab4b54188f7ec8d240461a9b6f65d, same first item 14204437 and last item 13760462) capped at exactly 1000 items against RecordsFound=2131. RPP=20, RPP=5000 and MRR=50 all also returned exactly 1000 items in XML mode (the response's own RPP refiner reports Opt Value=\"1000\" regardless of input). HTML mode (drop xml=1) DOES paginate correctly: Page=1 vs Page=2 at RPP=15 returned disjoint item ID sets, and Page=50&RPP=100 returned 100 distinct IDs. openparliament.ca (UNOFFICIAL) verified separately: https://api.openparliament.ca/speeches/?politician=pierre-poilievre&limit=2&format=json returned 200 with api-version: v1 header and pagination {offset, limit, next_url, previous_url} — but requires a non-default User-Agent (default curl UA got 400) and its `q=` param DOES NOT filter: ?q=carbon+tax and the unfiltered call both returned the same first object (time 4043-03-22, /committees/public-accounts/44-1/5/paul-thompson-2/) whose content contains no \"carbon\". Its /api/ docs page is behind Cloudflare JS challenge (403 to both WebFetch and curl) — so its stated rate limits and terms are UNVERIFIED.",
+  "queryParams": [
+    {
+      "purpose": "freetext",
+      "param": "Text",
+      "note": "Free-text over intervention body, speaker name, topics and constituency. Space-separated terms are OR-ish/fuzzy — response echoes <TextToHighlight>carbon~tax</TextToHighlight> and a one-day window matched 2 items; wrapping in double quotes gives a true phrase match (<TextToHighlight>carbon tax</TextToHighlight>, 1 item). 'AND' is not an operator (carbon AND tax produced the identical carbon~tax highlight and count as 'carbon tax'). Always URL-encode and quote phrases. The UI also builds multi-clause queries by concatenating into a single Text value with operators between clauses (Text2..Text5 are client-side only and are NOT sent)."
+    },
+    {
+      "purpose": "date_from",
+      "param": "ParlSes",
+      "note": "NOT a separate param. Date range is packed into the ParlSes value as the literal string From{YYYY-MM-DD}To{YYYY-MM-DD} — e.g. ParlSes=From2026-06-01To2026-06-18. Confirmed by reading /PublicationSearch/Scripts/PublicationSearch/PublicationSearch.js line 688: UpdateQueryString('', 'ParlSes', 'From' + $('#FromDatePicker').val() + 'To' + $('#ToDatePicker').val(), ...). Verified: returned items' dates all fell inside the window."
+    },
+    {
+      "purpose": "date_to",
+      "param": "ParlSes",
+      "note": "Same single ParlSes param — the To-date is the second half of the From..To string. ParlSes is marked IsMandatory=\"1\" in the refiner metadata; use ParlSes=All for the whole archive, ParlSes=45 for a parliament, ParlSes=45-1 for a specific session, or From..To for dates. Omitting it defaults to roughly the last seven sitting days."
+    },
+    {
+      "purpose": "speaker",
+      "param": "Per",
+      "note": "Numeric internal person ID, NOT a name — e.g. Per=25524 (Pierre Poilievre). Verified: 89/89 returned items were that member. Resolve names to IDs either from the <Refiner Code=\"Per\"> facet block returned in every response (<Opt Value=\"25524\" Count=\"89\" Name=\"Poilievre,  Pierre (Hon.)\"/>) or from the members roster at /Members/en/search/XML. Repeatable/concatenable (AllowConcatenation=\"1\")."
+    },
+    {
+      "purpose": "party",
+      "param": "Cauc",
+      "note": "Numeric caucus ID. Observed live values: 4=Liberal, 8781=Conservative, 3=New Democratic Party, 6=Bloc Québécois, 14130=Green Party, 8=Independent. Verified Cauc=8781 returned only Caucus Abbr=\"CPC\" items."
+    },
+    {
+      "purpose": "chamber",
+      "param": "PubType",
+      "note": "PubType=37 is House of Commons Hansard (the debates corpus) — this is the chamber/scope selector, keep it pinned. Committee Evidence is a different corpus exposed on the sibling /Search/en/publications/evidence entry point; other observed PubType values on the page include 0, 203, 10003, 40017. Senate debates are NOT here (separate institution, sencanada.ca)."
+    },
+    {
+      "purpose": "term",
+      "param": "ParlSes",
+      "note": "Parliament / session selector, same param as date range. Values: 'All', a parliament number ('45'), or parliament-session ('45-1'). The refiner block enumerates each with StartDate, DissolutionDate, SessionStartDate and ProrogationDate attributes, which is a free lookup table for term boundaries."
+    },
+    {
+      "purpose": "page",
+      "param": "Page",
+      "note": "BROKEN in xml=1 mode — verified byte-identical responses for Page=1/2/3. Works only in HTML mode. See pagination field."
+    },
+    {
+      "purpose": "size",
+      "param": "RPP",
+      "note": "Ignored in xml=1 mode (hard 1000-item ceiling regardless of value; the echoed RPP refiner always reports 1000). Honoured in HTML mode: RPP=15/50/100/1000 returned exactly that many distinct items."
+    },
+    {
+      "purpose": "freetext",
+      "param": "xml",
+      "note": "xml=1 switches the response from HTML to text/xml. Without it you get the ~250-300 KB HTML SERP. Also accepted (older documented form): View=L for list view."
+    },
+    {
+      "purpose": "freetext",
+      "param": "Item",
+      "note": "Fetch a single intervention by PublicationItem Id: ?PubType=37&Item=14204437&xml=1 → verified 200, RecordsFound=\"1\", 12,378 bytes, one PublicationItem. This is the cheap per-record refetch/canonical-ID lookup path."
+    },
+    {
+      "purpose": "freetext",
+      "param": "oob",
+      "note": "Order of Business facet. Verified live values: OralQuestionPeriod, GovernmentOrders, RoutineProceedings, StatementsbyMembers, AdjournmentProceedings. Useful to exclude procedural noise."
+    },
+    {
+      "purpose": "freetext",
+      "param": "Topic",
+      "note": "Discussed Topic (subject-index term) ID filter; Proc = Procedural Term ID; Prov = province/territory code (e.g. AB, QC); PubId restricts to one publication; targetLang=fr searches the French text while keeping the English UI; SBS=1 side-by-side bilingual. All appear as hidden inputs on the search form and as <Refiner Code=...> blocks in the XML."
+    }
+  ],
+  "pagination": "CONFIRMED TRAP — do not build a Lambda around `Page` in XML mode. In `xml=1` mode `Page` and `RPP` are both silently ignored and every response is capped at exactly 1000 `<PublicationItem>` elements, while the root `RecordsFound` attribute still reports the true total (observed RecordsFound=2131 with 1000 items; pages 1/2/3 byte-identical, md5 70dab4b54188f7ec8d240461a9b6f65d). Results are sorted date-DESCENDING (verified: 2026-06-18 first, 2025-09-25 last, monotonically non-increasing).\n\nTwo workable strategies:\n1) RECOMMENDED — date-window slicing (stay in XML): iterate narrow ParlSes=From..To windows and keep each window's RecordsFound under 1000. A single sitting day is comfortably safe: the broadest possible one-day query (Text=the, 2026-06-18) returned RecordsFound=239 with 239 items, i.e. an entire sitting day of Hansard is ~240 interventions, well under the cap. A one-month window overflowed (RecordsFound=2129 → 1000 items truncated). So loop day-by-day (or week-by-week for narrow queries) and check `RecordsFound <= 1000` per window; if it exceeds, subdivide. Read the count from the root attribute and assert it equals the item count, otherwise you are silently dropping data.\n2) HTML-mode paging (only if you need relevance-ordered top-N across the whole archive): drop `xml=1` and use Page + RPP. Verified working — Page=1 vs Page=2 at RPP=15 returned disjoint item ID sets, RPP=100 returned 100 distinct items, and Page=50&RPP=100 still returned 100 distinct items (deep paging works). But you then have to parse HTML (~300 KB/page) and only get `?PubType=37&Item={id}` links, so you'd refetch each item via `&Item={id}&xml=1`. Note /PublicationSearch/ is Disallowed in robots.txt.\n\nThere is no cursor, continuation token, next_url, or Link header anywhere in the XML response.",
+  "fieldMapping": [
+    {
+      "normalized": "title",
+      "sourcePath": "PublicationItem/SubjectOfBusiness, with PublicationItem/OrderOfBusiness as prefix/fallback",
+      "note": "There is no per-speech title. Best synthetic title is SubjectOfBusiness (observed: \"The Economy\", \"Government Response to Petitions\") optionally qualified by OrderOfBusiness (observed: \"Oral Question Period\", \"Routine Proceedings\"). The parent Publication/@Title is only the document label (\"Hansard - 139\"). Both business fields can be absent on early/unindexed sittings — Open Data notes subject indexing generally happens the day after publication."
+    },
+    {
+      "normalized": "speaker",
+      "sourcePath": "PublicationItem/Person/FirstName + ' ' + LastName (honorific at Person/Honorific); verbatim form at PublicationItem/XmlContent/Intervention/PersonSpeaking/Affiliation",
+      "note": "Prefer the structured Person node: Person/@Id (=25524) is the stable member ID and equals the value you feed back into Per=. Person/ProfileUrl gives //www.ourcommons.ca/Parliamentarians/en/members/25524. The Affiliation text is the full Hansard styling incl. role and party — \"Hon. Pierre Poilievre (Leader of the Opposition, CPC)\" — with Affiliation/@DbId=322132 (a role-membership ID, NOT the person ID: do not confuse the two). Person/@IsMember=\"1\" distinguishes MPs; non-member/official speakers may lack a Person node (0 of 239 lacked one in the sample day, but do not assume)."
+    },
+    {
+      "normalized": "party",
+      "sourcePath": "PublicationItem/Person/Caucus/@Abbr (short) and Caucus text (long)",
+      "note": "Observed @Abbr=\"CPC\" with element text \"Conservative Caucus\"; also seen Abbr=\"Lib.\" text \"Liberal Caucus\". Note the abbreviations are inconsistently punctuated (CPC vs Lib.) so normalize against the Cauc refiner IDs (4=Liberal, 8781=Conservative, 3=NDP, 6=Bloc, 14130=Green, 8=Independent) rather than string-matching. Person/Province/@Code (=\"AB\") and Person/Constituency (=\"Battle River—Crowfoot\") available alongside; constituency contains em-dashes."
+    },
+    {
+      "normalized": "date",
+      "sourcePath": "PublicationItem/@Date plus @Hour/@Minute/@Second",
+      "note": "@Date is already ISO \"2026-06-18\"; time is split across @Hour=\"14\" @Minute=\"38\" @Second=\"52\" (zero-padded strings, local Ottawa time, no timezone offset given — assume America/Toronto). Parent Publication/@Date and @Time=\"10:00\" give the sitting's start. A coarser in-text marker is XmlContent/Intervention/Content/Timestamp/@Hr + @Mn (=14/35), which is the Hansard printed (1435) marker and is rounded, so prefer the item attributes."
+    },
+    {
+      "normalized": "chamber",
+      "sourcePath": "Publication/@Organization, or hardcode from PubType=37",
+      "note": "Observed \"House of Commons\" (and \"Chambre des communes\" from the /fr/ locale — it is locale-dependent, so hardcode 'House of Commons' rather than passing the string through). Publication/@MeetingIsForSenateOrganization=\"0\" is also present. Raw per-sitting XML carries ExtractedItem Name=\"InstitutionDebate\" = \"House of Commons Debates\"."
+    },
+    {
+      "normalized": "term",
+      "sourcePath": "Publication/@Parliament and Publication/@Session",
+      "note": "Observed @Parliament=\"45\" @Session=\"1\" as separate integer attributes on the parent Publication (NOT on the PublicationItem — you must carry them down from the enclosing Publication element when flattening). Compose as '45-1'."
+    },
+    {
+      "normalized": "sessionRef",
+      "sourcePath": "Publication/@Parliament + '-' + Publication/@Session, plus Publication/@Title sitting number",
+      "note": "'45-1' round-trips directly as the ParlSes filter value and as the docviewer path segment. Publication/@Title=\"Hansard - 139\" yields sitting number 139; parse it out (or derive from PdfURL) to build the sitting-level URLs. Publication/@Id=14204756 is the document-level ID. The raw sitting XML additionally exposes Volume (\"Volume 152\") and Number (\"No. 139\") via ExtractedItem, which the search XML does not."
+    },
+    {
+      "normalized": "snippet",
+      "sourcePath": "concat of PublicationItem/XmlContent/Intervention/Content/ParaText text nodes",
+      "note": "This is the actual spoken text and it is FULL TEXT, not a truncated snippet — the search response embeds the complete intervention. Each <ParaText id=\"9423654\"> is one paragraph; join with newlines. Must strip inline markup: <Affiliation DbId=\"314774\" Type=\"1\">Prime Minister</Affiliation> (inline person/role references — keep the text, drop the tag), <I>, <B>, <Sup>, <Timestamp>, <FloorLanguage>, <Document>, <Quote>. Take the .//text() of Content but EXCLUDE Timestamp and FloorLanguage nodes or you will inject \"(1435)\" and \"[English]\" into the speech body. Also present: <IndexEntries><Term Id=\"38962\" IsProceduralTerm=\"0\">Economic policy</Term> — good keyword/topic metadata, with IsProceduralTerm=\"1\" flagging procedural boilerplate terms (\"Oral questions\") you probably want to drop."
+    },
+    {
+      "normalized": "sourceUrl",
+      "sourcePath": "construct: https://www.ourcommons.ca/documentviewer/en/{Parliament}-{Session}/house/sitting-{N}/hansard#Int-{PublicationItem/@EventId}",
+      "note": "VERIFIED: https://www.ourcommons.ca/documentviewer/en/45-1/house/sitting-139/hansard returned 200 (874 KB) and the page contains anchors of exactly the form id=\"Int-13591488\", \"Int-13593058\" — i.e. the anchor is @EventId, NOT @Id. Sitting number comes from Publication/@Title / PdfURL. Machine-stable alternates: ?PubType=37&Item={@Id} on /PublicationSearch/en/ (verified 200), PDF at Publication/@PdfURL (=/Content/House/451/Debates/139/HAN139-E.PDF, prefix with https://www.ourcommons.ca), and video at PublicationItem/@VideoURL (protocol-relative //www.ourcommons.ca/Embed/en/i/13593058/?ml=en — note /Embed/ is robots-Disallowed). Publication/@HtmlURL was empty in every response observed, so do not rely on it. Beware: many URLs in the XML are protocol-relative (leading //) and must be prefixed with https:."
+    },
+    {
+      "normalized": "docId",
+      "sourcePath": "PublicationItem/@Id (intervention), PublicationItem/@EventId (anchor/video), Publication/@Id (sitting document)",
+      "note": "Three distinct IDs, all observed: @Id=14204437 is the search-record ID and the only one accepted by the &Item= refetch param; @EventId=13593058 is the proceedings-event ID used for the #Int- anchor, the /Embed/ video path, and the id attribute on <Intervention id=\"13593058\">; Publication/@Id=14204756 is the sitting document. Recommend docId = @Id, and store @EventId separately since sourceUrl needs it. Also present: @Sequence=\"225\" (order within sitting), @Page=\"9593\" (Hansard page), @PdfPage=\"41\", and PreviousPublicationItem/NextPublicationItem sibling stubs (with Id + Person) that let you walk a debate in order without re-querying."
+    },
+    {
+      "normalized": "language",
+      "sourcePath": "PublicationItem/XmlContent/Intervention/Content/FloorLanguage/@language",
+      "note": "Per-intervention ORIGINAL floor language: observed both \"EN\" and \"FR\" within the same sitting (Canada is bilingual and the English Hansard contains translated French speeches). Also per-paragraph via the data-originallang attribute inside ParaText's HTML in some renderings. The /en/ vs /fr/ path segment controls which translation you retrieve, NOT what was actually said — to capture original wording you must fetch both locales or key off FloorLanguage. Whole-document language on raw sitting XML: <Hansard xml:lang=\"EN\">."
+    }
+  ],
+  "fullTextAccess": "Full verbatim text is EMBEDDED directly in the search response — no second call needed. Each `<PublicationItem>` carries `<XmlContent><Intervention><Content><ParaText>` with the complete spoken contribution (verified: a full multi-paragraph Poilievre Question Period intervention arrived inline). This is the single best property of this source: search and full text in one request. Cost: responses are large — ~5.5 MB for a 1000-item page, ~288 KB for 45 items, so roughly 6 KB/intervention. Budget Lambda memory/timeout accordingly and stream-parse (iterparse) rather than loading the DOM.\n\nAlternative bulk path (documented on the Open Data page, verified 200): whole-sitting verbatim XML at https://www.ourcommons.ca/Content/House/{Parliament}{Session}/Debates/{Sitting}/HAN{Sitting}-{E|F}.XML — e.g. /Content/House/451/Debates/139/HAN139-E.XML (415 KB) and /Content/House/441/Debates/100/HAN100-E.XML (682 KB). Note the parliament-session path segment is concatenated with no separator (\"451\" = 45th Parliament 1st Session, \"441\" = 44-1). These files use a different schema (root `<Hansard>`, `<ExtractedInformation><ExtractedItem Name=\"Volume|Number|Session|Parliament|Date|SpeakerName|Institution|Country\">`) and lack the search XML's Person/Caucus/OrderOfBusiness enrichment — so use them for backfill/ingest, not for query-time. PDF also available per sitting. Open Data states debates are \"typically available the next business day\"; subject indexing (SubjectOfBusiness/IndexEntries) lands a day later still, so recent items may have thinner metadata.",
+  "languages": "Fully bilingual English + French (both official). Locale is a path segment: /PublicationSearch/en/ vs /PublicationSearch/fr/ — verified the /fr/ call returns French metadata (Organization=\"Chambre des communes\") and the French PDF (HAN139-F.PDF). Crucially, the locale selects the TRANSLATION, not the original: the English Hansard includes translated versions of speeches delivered in French, and `Content/FloorLanguage/@language` (observed both EN and FR within one sitting) tells you what was actually spoken. To store original wording you must either fetch both locales and pick by FloorLanguage, or accept translated text. `targetLang=fr` lets you free-text search the French text from the English UI. Note French text contains accented characters and em-dashes in constituency names — the response is UTF-8 (content-type `text/xml; charset=utf-8`) but the raw sitting XML files are served as bare `text/xml` with a BOM, so decode as utf-8-sig there.",
+  "rateLimits": "No documented rate limit and no rate-limit headers observed. Response headers on the search endpoint carried no X-RateLimit-*, no Retry-After, and no quota signalling. Empirically 8 distinct queries fired back-to-back with zero delay all returned HTTP 200 (no 429, no throttling, no CAPTCHA), and roughly 30+ requests over the session were served without any block. HOWEVER: absence of an enforced limit is not permission. robots.txt explicitly Disallows /PublicationSearch/ and /Search/ for all user-agents, so there is no published crawl-delay to respect either — the operator's stated position is simply \"don't crawl this\". Practical guidance: treat as unmetered but self-throttle hard (suggest <=1 req/sec, single concurrent connection), send a descriptive User-Agent with a contact address, cache aggressively (responses are 6 KB/intervention so caching also saves real money), and prefer the non-robots-disallowed static /Content/House/.../HAN{n}-E.XML files for any bulk backfill. Technical contact for the Open Data feeds is infonet@parl.gc.ca — ask them before running sustained volume. UNVERIFIED: whether an undocumented WAF/Cloudflare-style threshold exists at higher rates; I deliberately did not stress-test a government service. For the unofficial openparliament.ca, rate limits are UNVERIFIED because its /api/ docs page returns 403 behind a Cloudflare JS challenge; it does require a non-default User-Agent (default curl UA got HTTP 400), which implies UA-based gating.",
+  "gotchas": [
+    "CONFIRMED BLOCKER: `Page` and `RPP` are silently ignored when `xml=1` is set. Pages 1/2/3 of the same query returned byte-identical documents (md5 70dab4b54188f7ec8d240461a9b6f65d) truncated at exactly 1000 items while RecordsFound reported 2131. A naive page-loop Lambda will happily ingest the same 1000 records N times and silently lose everything past item 1000. MITIGATION: slice by date window and assert RecordsFound == count(PublicationItem) on every response; subdivide the window when it exceeds 1000.",
+    "Date range is NOT a pair of params — it is packed into the single `ParlSes` value as the literal string `From2026-06-01To2026-06-18`. There is no fromDate/toDate/startDate query parameter despite FromDatePicker/ToDatePicker existing as client-side-only form IDs. Confirmed by reading PublicationSearch.js line 688.",
+    "`ParlSes` is flagged IsMandatory=\"1\". Omit it and you silently get only ~the last seven sitting days instead of the whole archive — an easy way to ship a backfill job that indexes one week and reports success. Pass ParlSes=All explicitly for archive-wide, or a From..To window.",
+    "Speaker filtering requires a numeric internal person ID (`Per=25524`), not a name. You need a name→ID resolution step; the good news is every response embeds a `<Refiner Code=\"Per\">` facet with Value/Name/Count pairs, and /Members/en/search/XML gives the full roster.",
+    "Three different ID spaces are present on one record and they are easy to swap by mistake: PublicationItem/@Id=14204437 (only this one works with &Item=), @EventId=13593058 (this is what the #Int- deep-link anchor and the /Embed/ video path use), and Publication/@Id=14204756 (the sitting). Additionally Affiliation/@DbId=322132 is a role-membership ID, NOT Person/@Id=25524.",
+    "Free-text `Text=` defaults to fuzzy/OR semantics — the response echoes `<TextToHighlight>carbon~tax</TextToHighlight>` for `Text=carbon tax`. `AND` is not honoured as an operator (it produced an identical highlight and count). Use double-quoted phrases for precision; verified quoted \"carbon tax\" narrowed a one-day result from 2 to 1 and echoed `carbon tax` without the tilde.",
+    "Coverage floor is roughly September 2001, NOT the full historical Hansard. ParlSes=37-1 returned items from 2001-09-20 onward; ParlSes=36-1 and 35-1 both returned RecordsFound=0, and a Feb-1994 date window returned 0. The ParlSes refiner's oldest enumerated parliament is the 37th. Anything pre-2001 needs a different source (e.g. the Canadiana/Library of Parliament historical Hansard digitisation) — do not promise a full archive.",
+    "Bilingual translation trap: the /en/ endpoint returns English text for speeches actually delivered in French. Only `Content/FloorLanguage/@language` (observed EN and FR in the same sitting) reveals the original. If your embeddings mix originals and translations without recording this, retrieval quality and any 'what they actually said' claim degrade.",
+    "robots.txt on www.ourcommons.ca explicitly Disallows /PublicationSearch/, /publicationsearch/, /Search/, /search/, /Embed/ and /ParlDataWidgets/ for all user-agents — i.e. the very endpoint this integration depends on. It is officially documented on the Open Data page and returns data to unauthenticated curl, but the robots policy is a real compliance/ToS signal: keep volume low, identify your client, cache, and be aware the operator may consider automated use of the search UI out of bounds. The static /Content/House/... Hansard files are NOT robots-disallowed and are the cleaner bulk path.",
+    "Copyright: reproduction of proceedings is permitted under the Speaker's permission ONLY if 'the reproduction is accurate and is not presented as official', and the permission explicitly 'does not extend to reproduction, distribution or use for commercial purpose of financial gain'. Non-conforming use can be treated as copyright infringement or contempt of Parliament. This is materially more restrictive than an open licence — the repo is a non-monetised sample (an earlier donation button has been removed), which defuses the commercial-use carve-out, but a 'not official' disclaimer plus source attribution remains mandatory.",
+    "This is a UI backend, not a versioned API: no schema/WSDL/OpenAPI, no version header, no JSON, no deprecation policy, and the response mixes results with UI refiner facets. It can change shape without notice. Write a defensive parser (tolerate missing Person, OrderOfBusiness, SubjectOfBusiness, FloorLanguage) and alarm on RecordsFound-vs-count mismatch and on unexpected content-type.",
+    "Response sizes are large: ~6 KB per intervention, ~5.5 MB for a maxed page. Use streaming XML parsing and generous Lambda memory/timeout; do not json-ify the whole DOM.",
+    "openparliament.ca is UNOFFICIAL third-party (not a government site — its own homepage says 'This is not a government site'; AGPLv3 code by Michael Mulley, supported by Open North) and its speeches API is a trap in two ways: (a) it requires a non-default User-Agent — default curl UA got HTTP 400; (b) `?q=` DOES NOT FILTER — ?q=carbon+tax and the unfiltered request returned the identical first object whose text contains no 'carbon'. So it gives you clean JSON with real pagination (offset/limit/next_url/previous_url, api-version: v1) and nice EN/FR-paired content, but NO working free-text search, which is our core requirement. Its /api/ docs page sits behind a Cloudflare JS challenge (403 to both WebFetch and curl), so its stated rate limits and terms of use are UNVERIFIED. Its /speeches/ feed also mixes committee testimony with chamber debates (first result was /committees/public-accounts/...), and it emitted a corrupt timestamp ('4043-03-22'). Usable at most as a secondary enrichment/ID-crosswalk source, never as the primary, and its terms must be confirmed before any use.",
+    "LEGISinfo (parl.ca/legisinfo/en/bills/json) is bills/legislation and is OUT OF SCOPE for debates, as is /Members/en/Votes/XML (voting records) — both are prominently linked from the same Open Data page and are easy to grab by mistake.",
+    "Senate of Canada debates are a separate institution and are NOT available here (MeetingIsForSenateOrganization=\"0\" on all House records). If the product claims 'Parliament of Canada', that gap needs stating.",
+    "The apex host ourcommons.ca redirects to www.ourcommons.ca, and the older documented path /Parliamentarians/en/PublicationSearch?... 302s to /publicationsearch/en/. Allowlist www.ourcommons.ca and either follow redirects or use the canonical /PublicationSearch/en/ path directly. Many URLs inside the XML are protocol-relative (leading //) and need an https: prefix.",
+    "There is no RSS/Atom alternative: /PublicationSearch/en/rss?... returned 404 despite refiners carrying IsRssRelevant attributes. Do not build change-detection on a feed; poll the latest sitting date instead."
+  ],
+  "confidence": "high"
+}

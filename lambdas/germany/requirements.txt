@@ -1,0 +1,4 @@
+# Runtime deps for the Germany fetcher Lambda. The shared gov_debates package is provided by
+# the shared Lambda layer (see infra); httpx is bundled here. boto3 is in the Lambda runtime.
+# Pinned exactly, in lockstep with lambdas/shared/layer-requirements.txt (threat model T7).
+httpx==0.28.1

@@ -1,0 +1,178 @@
+{
+  "countryKey": "de",
+  "displayName": "Germany — Deutscher Bundestag",
+  "verdict": "workable",
+  "hasLiveQueryApi": true,
+  "sourceName": "DIP (Dokumentations- und Informationssystem für Parlamentsmaterialien) API v1.5, Deutscher Bundestag — Parlamentsdokumentation",
+  "hosts": [
+    "search.dip.bundestag.de",
+    "dserver.bundestag.de"
+  ],
+  "protocol": "REST over HTTPS, JSON or XML (format=json|xml). OpenAPI 3.0.1 spec published unauthenticated at https://search.dip.bundestag.de/api/v1/openapi.yaml (title \"Deutscher Bundestag - DIP\", version 1.5, single server entry https://search.dip.bundestag.de/api/v1). Swagger UI at /api/v1/swagger-ui/index.html. Not OData; Solr-backed (cursor values are base64 Solr cursorMarks).",
+  "auth": "API key required on EVERY request; missing/bad key returns HTTP 401 with `www-authenticate: apikey realm=\"realm\"`. Two equivalent schemes, both in the official spec's `components.securitySchemes`: (1) header `Authorization: ApiKey <key>` (scheme name `ApiKeyHeader`, note the literal prefix \"ApiKey\" then a space) — PREFER THIS so the key never lands in access logs; (2) query param `apikey=<key>` (`ApiKeyQuery`). Both VERIFIED working (200). Register: email parlamentsdokumentation@bundestag.de (contact in spec `info.contact`) / see https://dip.bundestag.de/über-dip/hilfe/api. IMPORTANT: the OpenAPI spec itself publishes a working example key in the securityScheme `description` field (\"Beispiel: *ApiKey <public-demo-key-from-the-DIP-OpenAPI-spec>*\"), and Swagger UI auto-preauthorizes with it. I used that documented example key for all verification below. Treat it as a rotating public demo key, NOT as production credentials — request your own.",
+  "searchEndpoint": "GET /api/v1/aktivitaet — one record per individual spoken contribution (aktivitaetsart=\"Rede\", \"Zwischenfrage\", \"Kurzintervention\", \"Erwiderung\", \"Frage\"/\"Antwort\", ...) with speaker, date, term, session number and a page-anchored PDF deep link. Filter f.dokumentart=Plenarprotokoll to restrict to floor contributions (excludes written Drucksache activities). Companion: GET /api/v1/plenarprotokoll-text (and /plenarprotokoll-text/{id}) for the full verbatim Stenografischer Bericht text of a whole sitting.",
+  "exampleRequest": "https://search.dip.bundestag.de/api/v1/aktivitaet?f.person=Heil%20Hubertus&f.dokumentart=Plenarprotokoll&f.zuordnung=BT&f.datum.start=2025-01-01&f.datum.end=2026-08-03&format=json  (send header: Authorization: ApiKey <public-demo-key-from-the-DIP-OpenAPI-spec>)",
+  "verified": true,
+  "verificationNote": "All calls executed live via curl on 2026-08-03; nothing here is inferred. (1) Unauthenticated GET /api/v1/aktivitaet?format=json -> HTTP 401 {\"code\":401,\"message\":\"An API key is required...\"} with www-authenticate: apikey. (2) GET /api/v1/openapi.yaml -> HTTP 200, 2363 lines, no auth needed; all endpoint/param/schema names below are read from it. (3) The exampleRequest above -> HTTP 200, numFound=9, cursor=\"AoJw-MS325QDMkFrdGl2aXRhZXQtMTcwODg0Mw==\", documents[0] = {id:\"1784775\", titel:\"Hubertus Heil (Peine), MdB, SPD\", datum:\"2026-06-11\", aktivitaetsart:\"Rede\", wahlperiode:21, person_id:\"1268\", dokumentart:\"Plenarprotokoll\", fundstelle:{dokumentnummer:\"21/83\", seite:\"10089D\", anfangsseite:10086, endseite:10093, pdf_url:\"https://dserver.bundestag.de/btp/21/21083.pdf#P.10089\", xml_url:\"https://dserver.bundestag.de/btp/21/21083.xml\", herausgeber:\"BT\", id:\"5798\"}}. (4) Cursor pagination confirmed: page 1 of /aktivitaet?f.dokumentart=Plenarprotokoll&f.zuordnung=BT returned 100 docs of numFound=353747 + cursor \"AoJwkIjepZ8DMkFrdGl2aXRhZXQtMTc5MDkyNw==\"; replaying with &cursor=<that> returned a DIFFERENT 100 docs (first id 1790926) and a new cursor. (5) GET /plenarprotokoll-text?f.zuordnung=BT&f.datum.start=2026-06-11&f.datum.end=2026-06-11 -> numFound=1, doc id \"5798\", dokumentnummer \"21/83\", text field = 843,669 chars beginning \"Plenarprotokoll 21/83\\nDeutscher Bundestag\\nStenografischer Bericht\\n83. Sitzung...\". (6) GET /person/1268 -> {\"nachname\":\"Heil\",\"vorname\":\"Hubertus\",\"fraktion\":[\"SPD\"],\"funktion\":[\"MdB\"],\"wahlkreiszusatz\":\"Peine\",\"wahlperiode\":[14..21]} — this is where party comes from. (7) NEGATIVE, and the most important result: the `q` free-text param currently used in this repo DOES NOT EXIST. /plenarprotokoll?format=json returns numFound=5790; adding &q=Klimaschutz returns the identical 5790; adding &f.titel=Klimaschutz also returns 5790 (f.titel is not a valid param on that endpoint). Unknown query params are SILENTLY IGNORED, never 400. (8) /person?f.titel=Heil -> numFound=5630 (whole register, filter ignored) vs /person?f.person=Heil -> numFound=2, both nachname \"Heil\". (9) f.person IS valid on /aktivitaet: f.person=Heil%20Hubertus&f.dokumentart=Plenarprotokoll&f.zuordnung=BT -> numFound=332, aktivitaetsart histogram Rede 80 / \"Einleitende Ausführungen und Beantwortung\" 7 / Zwischenfrage 6 / \"Schriftliche Erklärung gem. § 31 GO-BT\" 3 / Erwiderung 2 / Kurzintervention 1. Repeating f.person twice (Heil + Mast) -> numFound=599, confirming documented OR semantics. (10) Confirmed live 404 for the repo's id bug: /plenarprotokoll-text/1697688 (an aktivitaet id) -> HTTP 404 {\"code\":404,\"message\":\"ID not found: 1697688\"}, while /plenarprotokoll-text/5683 (that activity's fundstelle.id) -> HTTP 200. (11) Page size differs per endpoint: /aktivitaet and /plenarprotokoll return 100 docs/page, /plenarprotokoll-text returns only 10. (12) dserver.bundestag.de is a SECOND host: PDF HEAD -> 200; the XML (1.29 MB) contains 150 <rede> elements, 521 <redner> and 495 <fraktion> tags with per-speech speaker+party markup.",
+  "queryParams": [
+    {
+      "purpose": "freetext",
+      "param": "(NONE on the debate endpoints — f.titel elsewhere)",
+      "note": "HARD BLOCKER, VERIFIED. There is no free-text/full-text search parameter on /aktivitaet, /plenarprotokoll, /plenarprotokoll-text or /person. The only text-ish filter, f.titel, exists ONLY on /vorgang, /vorgangsposition, /drucksache, /drucksache-text — i.e. on procedures and printed matter, not on speeches. And f.titel searches the TITLE field only, never speech body text. Because unknown params are silently dropped, the repo's current `q=<query>` is a no-op that returns unfiltered chronological results while looking like it worked. Topic search over what members actually SAID must be done client-side over the `text` field of /plenarprotokoll-text, or indirectly: f.deskriptor / f.sachgebiet on /aktivitaet (controlled-vocabulary subject headings), or f.titel on /vorgang -> take vorgang id -> /aktivitaet?f.vorgang is NOT available (use f.vorgangsposition_id)."
+    },
+    {
+      "purpose": "date_from",
+      "param": "f.datum.start",
+      "note": "YYYY-MM-DD, inclusive. Valid on /aktivitaet, /plenarprotokoll, /plenarprotokoll-text, /drucksache(-text), /vorgang, /vorgangsposition, /person. VERIFIED."
+    },
+    {
+      "purpose": "date_to",
+      "param": "f.datum.end",
+      "note": "YYYY-MM-DD, inclusive. VERIFIED (2025-01-01..2026-08-03 window returned 9 hits)."
+    },
+    {
+      "purpose": "speaker",
+      "param": "f.person",
+      "note": "Array/repeatable, OR semantics. Format is \"Nachname Vorname\" as a phrase — spec example value \"Steinmeier Frank Walter\". VERIFIED on /aktivitaet and /person. NOT available on /plenarprotokoll or /plenarprotokoll-text. Prefer the numeric f.person_id (repeatable, OR) once resolved via /person — it is exact and avoids namesake collisions (f.person=Heil matched 2 distinct people)."
+    },
+    {
+      "purpose": "speaker",
+      "param": "f.person_id",
+      "note": "Repeatable integer, OR semantics. Resolve name -> id once via GET /person?f.person=<Nachname Vorname>, then filter activities by id. Recommended primary speaker path."
+    },
+    {
+      "purpose": "chamber",
+      "param": "f.zuordnung",
+      "note": "Enum BT | BR | BV | EK (Bundestag / Bundesrat / Bundesversammlung / Europakammer). MUST set f.zuordnung=BT — the DIP corpus mixes in Bundesrat material (an unfiltered /plenarprotokoll page returned 'Protokoll der 1067. Sitzung des Bundesrates' alongside Bundestag sittings). Not available on /person."
+    },
+    {
+      "purpose": "term",
+      "param": "f.wahlperiode",
+      "note": "Integer electoral term, e.g. 20 or 21. VERIFIED (current term observed = 21)."
+    },
+    {
+      "purpose": "page",
+      "param": "cursor",
+      "note": "Opaque base64 Solr cursorMark from the previous response's top-level `cursor`. See pagination."
+    },
+    {
+      "purpose": "size",
+      "param": "(NONE)",
+      "note": "No page-size/limit/offset/rows param exists. Page size is fixed server-side and differs per endpoint: 100 for /aktivitaet and /plenarprotokoll, 10 for /plenarprotokoll-text. VERIFIED."
+    },
+    {
+      "purpose": "freetext",
+      "param": "f.dokumentart",
+      "note": "Enum Drucksache | Plenarprotokoll, on /aktivitaet. Set f.dokumentart=Plenarprotokoll to keep only floor contributions — without it you get written Kleine-Anfrage co-signature activities that are not speeches at all (my first unfiltered probe returned exactly that)."
+    },
+    {
+      "purpose": "freetext",
+      "param": "f.deskriptor",
+      "note": "Repeatable controlled-vocabulary subject descriptor, AND semantics; on /aktivitaet, /vorgang. Best available server-side topic proxy given no full-text search. Values are returned in each document's deskriptor[] array (e.g. {name:'Arbeitsmarktpolitik', typ:'Sachbegriffe'}) so you can discover valid terms from results."
+    },
+    {
+      "purpose": "freetext",
+      "param": "f.sachgebiet",
+      "note": "Repeatable policy-area filter on /aktivitaet, /vorgang. Coarser topic proxy."
+    },
+    {
+      "purpose": "sessionRef",
+      "param": "f.dokumentnummer",
+      "note": "Repeatable, OR. Sitting reference in the form \"<term>/<sitting>\", e.g. 21/83. Lets you jump straight from a citation to the sitting or its activities."
+    },
+    {
+      "purpose": "sessionRef",
+      "param": "f.plenarprotokoll",
+      "note": "Integer protocol id on /aktivitaet — returns every contribution in one sitting. Pass the fundstelle.id (e.g. 5798), NOT the activity id."
+    },
+    {
+      "purpose": "size",
+      "param": "format",
+      "note": "json | xml, default json. Harmless to send explicitly."
+    }
+  ],
+  "pagination": "Opaque forward-only cursor (Solr cursorMark); no offset/limit and no total-page count. `numFound` (total) and `cursor` (string) are both REQUIRED top-level fields of every list response per the spec's ListResponseBase schema, so `cursor` is ALWAYS present — even on the last page. Loop: replay the ORIGINAL request with every filter unchanged plus &cursor=<previous response's cursor>. Termination condition per official spec: stop when the returned cursor is IDENTICAL to the one you sent (\"Es können solange Folgeanfragen gestellt werden, bis sich der cursor nicht mehr ändert\"). Do NOT stop on a falsy/absent cursor — that never happens and would loop forever; also do not rely on an empty documents array. Page size is fixed and not configurable (100 for /aktivitaet and /plenarprotokoll, 10 for /plenarprotokoll-text — VERIFIED), so a full-corpus crawl of /aktivitaet (numFound 353,747 for BT plenary activities) is ~3,540 requests. Always cap page count and always send f.zuordnung/f.datum filters to keep result sets bounded.",
+  "fieldMapping": [
+    {
+      "normalized": "title",
+      "sourcePath": "documents[].vorgangsbezug[0].titel  (fallback: documents[].titel)",
+      "note": "COUNTER-INTUITIVE AND A LIVE BUG IN THIS REPO: on /aktivitaet, `titel` is NOT a debate subject — it is the SPEAKER'S NAME, verified as \"Hubertus Heil (Peine), MdB, SPD\" (spec example: \"Olaf Scholz, Bundesmin., Bundesministerium der Finanzen\"). The human-readable debate topic lives in vorgangsbezug[0].titel (e.g. \"Einleitende Ausführungen und Befragung des Bundesministers für Arbeit und Soziales, Hubertus Heil...\"). vorgangsbezug is capped at the first 4 linked procedures (maxItems 4) and can be absent, so fall back to `abstract`, then to fundstelle.dokumentnummer. On /plenarprotokoll-text, `titel` IS a real title (\"Protokoll der 199. Sitzung des 20. Deutschen Bundestages\")."
+    },
+    {
+      "normalized": "speaker",
+      "sourcePath": "documents[].titel  (authoritative: documents[].person_id -> GET /person/{person_id} -> vorname + \" \" + nachname)",
+      "note": "aktivitaet.titel is a single unsplit display string bundling name + constituency + role + party. Do NOT regex-split it (the repo's current _speaker_from_activity_title hardcodes a party list and breaks on \"Bundesmin.\", \"BSW\", \"Die Linke\", independents). Correct path: person_id is a REQUIRED field on every Aktivitaet — resolve it against /person/{id} and cache. Verified: person_id \"1268\" -> {vorname:\"Hubertus\", nachname:\"Heil\"}."
+    },
+    {
+      "normalized": "party",
+      "sourcePath": "GET /person/{person_id} -> fraktion[0]  (or person_roles[].fraktion matched on wahlperiode_nummer)",
+      "note": "VERIFIED ABSENT from /aktivitaet: a full single-activity fetch (/aktivitaet/1697688) returned exactly ['aktivitaetsart','aktualisiert','datum','deskriptor','dokumentart','fundstelle','id','person_id','titel','typ','vorgangsbezug','vorgangsbezug_anzahl','wahlperiode'] — no fraktion. The repo's _first(doc,['fraktion','fraktionname']) therefore always yields null. Party requires the /person join: /person/1268 -> fraktion:[\"SPD\"]. fraktion is an ARRAY (party switchers) and person_roles[] carries per-term fraktion with wahlperiode_nummer, so pick the entry matching the speech's wahlperiode rather than blindly taking [0]. Alternative: the dserver XML carries <fraktion> inline per <rede> (495 occurrences in the sitting I parsed)."
+    },
+    {
+      "normalized": "date",
+      "sourcePath": "documents[].datum  (fallback documents[].fundstelle.datum)",
+      "note": "ISO YYYY-MM-DD, REQUIRED field, date of the sitting. Verified \"2026-06-11\". Distinct from fundstelle.verteildatum (publication date, e.g. 2026-06-12) and from `aktualisiert` (RFC3339 record-modified timestamp with offset, e.g. \"2025-03-07T11:01:34+01:00\") — use `aktualisiert` for incremental sync via f.aktualisiert.start, never as the speech date."
+    },
+    {
+      "normalized": "chamber",
+      "sourcePath": "documents[].fundstelle.herausgeber  (request-side: f.zuordnung=BT)",
+      "note": "Verified value \"BT\". Enum BT|BR|BV|EK. Hardcode chamber=\"Bundestag\" only if you actually sent f.zuordnung=BT, otherwise you WILL mislabel Bundesrat protocols that DIP returns from the same endpoints."
+    },
+    {
+      "normalized": "term",
+      "sourcePath": "documents[].wahlperiode",
+      "note": "Integer, REQUIRED. Verified 21 (current) and 20. Note /person.wahlperiode is an ARRAY of terms, not a scalar — different shape, do not share a parser."
+    },
+    {
+      "normalized": "sessionRef",
+      "sourcePath": "documents[].fundstelle.dokumentnummer  (+ fundstelle.seite / anfangsseite / endseite)",
+      "note": "Verified \"21/83\" = 83rd sitting of the 21st term. Add fundstelle.seite (\"10089D\" — page + column quadrant A-D) for a precise Hansard-style citation; anfangsseite/endseite (10086/10093) give the debate item's span. The repo's current session_number derivation reads doc.dokumentnummer, which does NOT exist on Aktivitaet — it is nested under fundstelle."
+    },
+    {
+      "normalized": "snippet",
+      "sourcePath": "(not available on /aktivitaet) — documents[].text from /plenarprotokoll-text, sliced around fundstelle.anfangsseite",
+      "note": "IMPORTANT: /aktivitaet returns NO speech text — no `text` field at all, and `abstract` is a terse procedural note (spec example \"Zusammenberaten mit Finanzplan\"), not a quote. The repo's snippet falls back to `titel`, which means the snippet is just the speaker's name. To get real words: take fundstelle.id -> GET /plenarprotokoll-text/{fundstelle.id} -> `text` (verified 619,111 and 843,669 chars for two sittings) and locate the passage using fundstelle.anfangsseite/seite. Note `text` is one flat untagged blob for the whole sitting — it is NOT segmented per speaker."
+    },
+    {
+      "normalized": "sourceUrl",
+      "sourcePath": "documents[].fundstelle.pdf_url",
+      "note": "Verified page-anchored deep link \"https://dserver.bundestag.de/btp/21/21083.pdf#P.10089\" — lands on the exact page of that contribution, ideal for citation. fundstelle.xml_url (\"...21083.xml\") is the machine-readable twin. Both are on host dserver.bundestag.de, NOT search.dip.bundestag.de — allowlist both or your citation links break. For a human-facing DIP landing page use https://dip.bundestag.de/vorgang/-/<vorgangsbezug[0].id> (UNVERIFIED URL pattern — I did not fetch it; prefer the pdf_url, which I did verify)."
+    },
+    {
+      "normalized": "docId",
+      "sourcePath": "documents[].id  (protocol-level: documents[].fundstelle.id)",
+      "note": "TWO DISTINCT ID NAMESPACES — this is a confirmed crash in the repo. Aktivitaet.id (\"1784775\") is the contribution id and is valid ONLY at /aktivitaet/{id}. The protocol id is fundstelle.id (\"5798\") and is what /plenarprotokoll-text/{id} wants. I verified /plenarprotokoll-text/1697688 (an activity id) -> HTTP 404 \"ID not found\", while /plenarprotokoll-text/5683 (its fundstelle.id) -> 200. get_bundestag_document_text in tools.py passes the search result's dip_id (an activity id) straight into the text endpoint, so it 404s on every activity-derived call. Suggest emitting a compound docId like \"aktivitaet:1784775@protokoll:5798\" and also surfacing fundstelle.id as its own field. All ids are STRINGS matching ^\\d+$ in the spec — do not coerce to int."
+    },
+    {
+      "normalized": "language",
+      "sourcePath": "(absent — hardcode \"de\")",
+      "note": "No language field anywhere in the spec or in any observed payload. Entire corpus is German. Hardcode \"de\"; do not attempt detection."
+    }
+  ],
+  "fullTextAccess": "Three tiers, in increasing fidelity. (1) Metadata only — /aktivitaet gives you one row per spoken contribution with speaker, date, term, sitting and a page-anchored PDF link, but ZERO speech text. (2) Sitting-level verbatim text — GET /plenarprotokoll-text/{fundstelle.id} (or the list endpoint, which also embeds `text`) returns the complete Stenografischer Bericht as a single plain-text blob: VERIFIED 619,111 chars for sitting 20/199 and 843,669 chars for 21/83. This is the real Hansard equivalent, but it is UNSEGMENTED — no per-speaker boundaries, no speaker tags, interjections inlined. To attribute a quote you must slice it yourself using the activity's fundstelle.anfangsseite/endseite/seite, or string-match the speaker name. Also note the list endpoint pages only 10 at a time while shipping ~0.5-1 MB of text per document, so expect multi-MB responses — set generous timeouts (the repo's 20 s is tight) and never fetch these without a date/term filter. (3) Best fidelity, structured per speech — the fundstelle.xml_url on dserver.bundestag.de. I downloaded https://dserver.bundestag.de/btp/21/21083.xml (1.29 MB) and confirmed 150 <rede> elements, each with a nested <redner id=...><name><vorname>/<nachname>/<rolle> and <fraktion> (521 <redner>, 495 <fraktion> tags), plus <kommentar> elements for interjections and <p klasse=\"J_1\"> paragraphs for the spoken text. If you want clean per-speaker speech records with party attached, parse this XML rather than trying to split the DIP `text` blob. Cost: a second host to allowlist and an XML parser.",
+  "languages": "German only (de). No language parameter, no language field, no translations. Filter values are German-language too (e.g. aktivitaetsart \"Rede\", \"Zwischenfrage\", \"Kurzintervention\", \"Erwiderung\", \"Schriftliche Erklärung gem. § 31 Geschäftsordnung BT\"), and f.person expects German name order \"Nachname Vorname\". Payloads are UTF-8 and contain non-breaking spaces (U+00A0) inside references like \"199. Sitzung\" and party names like \"BÜNDNIS 90/DIE GRÜNEN\" — normalize U+00A0 to a plain space before matching or your speaker/party comparisons will silently miss.",
+  "rateLimits": "No published numeric rate limit in the OpenAPI spec, and no rate-limit headers on any response I inspected (no X-RateLimit-*, no Retry-After). The only stated policy is the 401 body's warning: \"Misuse of this service may lead to blocking your requests\" — i.e. enforcement is discretionary blocking, not a documented quota. Empirically 12 rapid sequential requests all returned 200 with no throttling, but that is NOT evidence of a safe sustained rate. Terms of service: https://dip.bundestag.de/%C3%BCber-dip/nutzungsbedingungen (referenced as info.termsOfService in the spec; I did not fetch it — the DIP site is a JS-only SPA that returns no server-rendered text, so the ToS text is UNVERIFIED and should be read before any bulk crawl). Practical guidance: single-threaded, ~1 req/s, a hard page cap, retry on 5xx with backoff, and cache /person lookups aggressively (they are the join for speaker+party and are highly repetitive). Get your own key rather than sharing the published example key, whose quota you have no control over.",
+  "gotchas": [
+    "BLOCKER: there is NO free-text search over speech content. The `q` parameter used today in agent/src/parlamentgpt_agent/tools.py (line ~235) does not exist in the DIP API. VERIFIED: /plenarprotokoll?format=json -> numFound 5790; adding &q=Klimaschutz -> the same 5790. Every user topic query is currently answered with unfiltered, reverse-chronological results that merely look like a successful search. This is the single most important finding.",
+    "Unknown query parameters are SILENTLY IGNORED — never a 400. A typo'd or invented f.* name degrades to 'return everything' instead of failing loudly. Validate param names against the OpenAPI spec, and add a canary test asserting that a filtered query returns FEWER results than the unfiltered one.",
+    "BUG: /person is queried with f.titel in tools.py (line ~233). f.titel is not a valid parameter on /person. VERIFIED: /person?f.titel=Heil -> numFound 5630 (the entire person register); /person?f.person=Heil -> numFound 2. Person lookup is currently returning the whole register.",
+    "BUG, inverted logic: tools.py line ~240 reads `if speaker and document_type != \"aktivitaet\": params[\"f.person\"] = speaker` — so f.person is applied to every endpoint EXCEPT the one where it actually works. VERIFIED: f.person IS supported on /aktivitaet (f.person=Heil%20Hubertus&f.dokumentart=Plenarprotokoll -> numFound 332) and is NOT supported on /plenarprotokoll or /plenarprotokoll-text. The consequence is MAX_DIP_SCAN_PAGES=25 pages x 100 docs of client-side name-regex scanning to emulate a filter the server offers natively — 25 wasted round trips per speaker query, with false negatives whenever the speaker's activities fall outside the first 2500 chronological rows.",
+    "BUG, guaranteed 404: get_bundestag_document_text passes a search result's dip_id (an /aktivitaet id) to /plenarprotokoll-text/{id}. VERIFIED: /plenarprotokoll-text/1697688 -> HTTP 404 {\"code\":404,\"message\":\"ID not found: 1697688\"}; the correct id is that activity's fundstelle.id, /plenarprotokoll-text/5683 -> 200. Activity ids and protocol ids are separate namespaces. Propagate fundstelle.id through search results.",
+    "On /aktivitaet, `titel` is the SPEAKER NAME, not the debate title (verified \"Hubertus Heil (Peine), MdB, SPD\"). _parse_document maps it to `title`, and snippet falls back to titel as well — so results currently render the speaker's name as both title and snippet. Real subject is vorgangsbezug[0].titel.",
+    "Party is NOT on /aktivitaet. A full /aktivitaet/{id} fetch returned no `fraktion` key, so _first(doc,['fraktion','fraktionname']) always yields null. Party requires joining person_id -> /person/{id} -> fraktion[]. It is an array, and person_roles[].fraktion is per-wahlperiode — pick the entry matching the speech's term or you will mislabel party switchers.",
+    "MUST send f.zuordnung=BT. DIP mixes chambers in the same endpoints: an unfiltered /plenarprotokoll page returned 'Protokoll der 1067. Sitzung des Bundesrates' next to Bundestag sittings. Without this filter you will attribute Bundesrat speech to the Bundestag.",
+    "MUST send f.dokumentart=Plenarprotokoll on /aktivitaet. 'Aktivitaet' means any parliamentary activity, not just speech: my first unfiltered probe (numFound 39,090) returned page after page of 'Kleine Anfrage' co-signature records — written questions, nobody spoke. Those are not floor contributions.",
+    "You CANNOT filter to speeches server-side. There is no f.aktivitaetsart parameter despite aktivitaetsart being a returned field. Only ~40% of Plenarprotokoll activities are aktivitaetsart='Rede' (observed histogram for one speaker: Rede 80 of 332; a single sitting yielded only Antwort 46 / Frage 46 / Zusatzfrage 8 and zero Rede). Filter client-side and over-fetch accordingly — and decide deliberately whether Zwischenfrage/Kurzintervention/Erwiderung count as speeches for your use case.",
+    "No page-size parameter exists. Page size is server-fixed and differs per endpoint: 100 for /aktivitaet and /plenarprotokoll, 10 for /plenarprotokoll-text. A `max_results` above 100 cannot be satisfied in one request, and paging /plenarprotokoll-text is 10-at-a-time while each document carries ~0.5-1 MB of text.",
+    "Cursor termination is 'cursor stopped changing', NOT 'cursor is absent'. Per ListResponseBase, `cursor` is a REQUIRED field and is always populated even on the final page. _next_cursor's falsy-check will therefore never fire; the loop only exits via the seen_cursors set (which does work) or the page cap. Make the documented equality check explicit. Also: `cursorMark`/`nextCursor` are not DIP fields — the top-level key is exactly `cursor`.",
+    "The response key is `documents` (and `numFound`). `dokumente` does not exist in the spec or any observed payload — that fallback in tools.py is dead code.",
+    "Two hosts are required, not one. Every citation link (fundstelle.pdf_url, fundstelle.xml_url) points at dserver.bundestag.de, while the API lives on search.dip.bundestag.de. The dip_client's single-host ALLOWED_DIP_HOST guard is correct for API egress, but any feature that fetches or validates source documents needs dserver.bundestag.de allowlisted too.",
+    "The OpenAPI spec publishes a working API key in a description field and Swagger UI auto-authorizes with it. Convenient for verification (I used it for everything above) but it is a shared public demo key with a quota you do not control and can be rotated without notice. Do not ship it — request a dedicated key from parlamentsdokumentation@bundestag.de.",
+    "Payloads contain U+00A0 non-breaking spaces inside citations and party names ('199. Sitzung', 'BÜNDNIS 90/DIE GRÜNEN'). _normalize_person_name strips accents but not U+00A0, so name/party matching can silently fail. Normalize NBSP to space first.",
+    "f.person is a phrase match in 'Nachname Vorname' order and matches namesakes (f.person=Heil -> 2 distinct people). Resolve to numeric f.person_id via /person once, cache it, and filter by id for correctness.",
+    "Do not confuse `aktualisiert` (record last-modified, RFC3339 with timezone offset) with `datum` (sitting date). f.aktualisiert.start/end are the right tool for incremental sync; using aktualisiert as the speech date will misdate records — the 2024-11-13 sitting I fetched carried aktualisiert 2025-03-07.",
+    "/plenarprotokoll-text responses are multi-MB. The repo's DIP_TIMEOUT_S default of 20 s is likely too tight for the list variant over a wide date range; raise it for text endpoints or always pin a single date/dokumentnummer.",
+    "The consumer-facing dip.bundestag.de site (including the API help page and the terms of service) is a JavaScript-only SPA that serves no server-rendered text — curl and WebFetch both return only the string 'DIP'. The authoritative machine-readable documentation is /api/v1/openapi.yaml, which is served unauthenticated; use it as the source of truth."
+  ],
+  "confidence": "high"
+}

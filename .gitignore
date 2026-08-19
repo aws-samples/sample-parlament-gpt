@@ -1,0 +1,32 @@
+# Secrets / env
+.env
+.env.local
+*.env
+!*.env.example
+!.env.example
+
+# Python
+agent/.venv/
+# Each Lambda adapter and the shared layer get their own venv for testing.
+lambdas/*/.venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Node
+node_modules/
+frontend/.next/
+infra/cdk.out/
+infra/*.js
+infra/*.d.ts
+!infra/jest.config.js
+
+# Misc
+.DS_Store
+infra/cdk.context.json
+infra/cdk.out/
+
+# Untracked per-operator overrides (pinned deploy context etc.)
+Makefile.local

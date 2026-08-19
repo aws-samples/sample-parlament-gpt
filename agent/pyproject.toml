@@ -1,0 +1,33 @@
+[project]
+name = "parlamentgpt-agent"
+version = "0.1.0"
+description = "Security-hardened Strands agent answering questions about Bundestag speeches via the DIP API."
+requires-python = ">=3.11"
+# Exact pins — keep in lockstep with requirements.txt (the container build); see the
+# comment there for why (private strands accessor in gateway.py, threat model T7).
+dependencies = [
+    "strands-agents==1.52.0",
+    "strands-agents-tools==0.8.6",
+    "bedrock-agentcore==1.22.0",
+    "httpx==0.28.1",
+    "boto3==1.43.74",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "respx>=0.21",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

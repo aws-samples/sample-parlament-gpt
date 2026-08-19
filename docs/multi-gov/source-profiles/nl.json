@@ -1,0 +1,156 @@
+{
+  "countryKey": "nl",
+  "displayName": "Netherlands — Tweede Kamer (House of Representatives)",
+  "verdict": "hard",
+  "hasLiveQueryApi": true,
+  "sourceName": "Tweede Kamer Open Data Portaal / Gegevensmagazijn OData v4 API (verbatim reports produced by VLOS 2.0)",
+  "hosts": [
+    "gegevensmagazijn.tweedekamer.nl",
+    "opendata.tweedekamer.nl"
+  ],
+  "protocol": "OData v4 (JSON responses, OData-Version: 4.0 header confirmed) for metadata rows; plain HTTP GET returning text/xml for the actual transcript payload. No auth handshake, no token host. Docs live on opendata.tweedekamer.nl (HTML only — not needed at runtime, allowlist optional).",
+  "auth": "none. Fully open, anonymous. Verified: a bare `curl` with no headers, no key, no cookie against https://gegevensmagazijn.tweedekamer.nl/OData/v4/2.0/Verslag?$top=1 returned HTTP 200. No registration exists or is required. Official docs page (/documentatie/odata-api) mentions no authentication, API keys, or tokens.",
+  "searchEndpoint": "Two-step, mandatory. STEP 1 (discover/enumerate meetings + reports): GET /OData/v4/2.0/Verslag with $filter/$expand=Vergadering — returns metadata rows ONLY (no speech text). STEP 2 (get the actual spoken words): GET /OData/v4/2.0/Verslag/{Id}/resource — returns the whole meeting's VLOS 2.0 XML transcript as a single 0.9–3 MB blob. There is NO endpoint that searches or returns individual speech rows.",
+  "exampleRequest": "https://gegevensmagazijn.tweedekamer.nl/OData/v4/2.0/Verslag?$filter=Verwijderd%20eq%20false%20and%20Soort%20eq%20'Eindpublicatie'%20and%20Vergadering/Soort%20eq%20'Plenair'%20and%20Vergadering/Datum%20ge%202026-01-01T00:00:00Z%20and%20Vergadering/Datum%20le%202026-06-30T00:00:00Z&$expand=Vergadering&$orderby=Vergadering/Datum%20desc&$top=5&$count=true",
+  "verified": true,
+  "verificationNote": "Executed live via curl on 2026-08-03; nothing was blocked by the sandbox. (1) $metadata → HTTP 200, 57755 bytes, 38 EntityTypes under namespace TK.DA.GGM.OData; confirmed exact property names on Verslag (Id, Soort, Status, ContentType, ContentLength, GewijzigdOp, ApiGewijzigdOp, Verwijderd, Vergadering_Id), Vergadering (Titel, Zaal, Vergaderjaar, VergaderingNummer, Datum, Aanvangstijd, Sluiting, Kamer), Activiteit, ActiviteitActor, Persoon, Fractie. (2) The exampleRequest above → HTTP 200, \"@odata.count\": 50, first row Id=4807aa73-3938-4c37-90da-8c1891e39169, Soort=\"Eindpublicatie\", Status=\"Gecorrigeerd\", Vergadering.Titel=\"78e vergadering, donderdag 4 juni 2026\", Vergaderjaar=\"2025-2026\", VergaderingNummer=78, Kamer=\"Tweede Kamer\", ContentLength=942077. (3) GET /OData/v4/2.0/Verslag/4807aa73-.../resource → HTTP 200, Content-Type text/xml, 942077 bytes, root element <vlosCoreDocument Source=\"VLOS2.0\" soort=\"Eindpublicatie\" status=\"Gecorrigeerd\" versie=\"1.3\" xmlns=\"http://www.tweedekamer.nl/ggm/vergaderverslag/v1.0\">, containing 245 <woordvoerder>, 345 <interrumpant>, 838 <spreker> elements. (4) Real observed speech unit: <woordvoerder><spreker soort=\"Tweede Kamerlid\"><fractie>VVD</fractie><aanhef>De heer</aanhef><verslagnaam>Van Campen</verslagnaam><weergavenaam>Campen van</weergavenaam><voornaam>Thom</voornaam><achternaam>Campen van</achternaam><functie>lid Tweede Kamer</functie></spreker><markeertijdbegin>2026-07-02T10:15:09</markeertijdbegin><isvoorzitter>true</isvoorzitter><tekst><alinea><alineaitem>Ik open de vergadering van donderdag 2 juli 2026.</alineaitem></alinea></tekst></woordvoerder>. (5) CONFIRMED $search IS SILENTLY IGNORED: /Activiteit/$count returned 99117; /Activiteit/$count?$search=klimaat returned 99117; /Activiteit/$count?$search=zzzznonsensexyz ALSO returned 99117 — identical, no error, no filtering. (6) contains() works: /Activiteit/$count?$filter=contains(Onderwerp,'klimaat') → 833, and 'Klimaat' → 833 (case-insensitive). substringof() → HTTP 400 \"unknown function\". (7) Pagination: $top=250 → 200 with 250 rows; $top=251 and $top=5000 → HTTP 400 \"The limit of '250' for Top query has been exceeded\"; request with no $top → 250 rows plus \"@odata.nextLink\": \".../Vergadering?$skiptoken=Id-e18c70d3-b159-4dd6-a4dd-08b1fc0383fa\"; $skip=250 works. (8) Volume: 23263 non-deleted Verslag rows, of which only 1458 are Soort='Eindpublicatie'; 1394 Vergadering rows with Soort='Plenair'. Earliest Vergadering = 2013-06-25 (\"99e vergadering, dinsdag 25 juni 2013\"). (9) DEDUP HAZARD CONFIRMED: Vergadering_Id 67d1ec85-98ce-4da0-adfc-462cdf5963fd has 10 non-deleted Verslag rows, all ('Tussenpublicatie','Ongecorrigeerd'), ContentLength growing 2242856 → 3028259 as the sitting progressed. (10) ID-JOIN BREAKAGE CONFIRMED: every objectid harvested from the XML 404s against OData — Persoon(eb0e02d7-1747-4ad4-9646-d75f6a82f58d) → 404, and 5 more spreker objectids → 404; Activiteit(8958c8f8-...) and 4 more activiteit objectids → 404; Vergadering(65fe4eec-...) (the vergadering/@objectid inside the XML) → 404 even though the containing Verslag's Vergadering_Id 67d1ec85-... resolves fine. (11) WORKING join key found: XML <parlisid>2026A05269</parlisid> → /Activiteit?$filter=Nummer eq '2026A05269' → HTTP 200, Id=61d086d2-d795-44e5-b149-9c40ecfb893c, Soort=\"Hamerstukken\". (12) Lambda filters work: /Activiteit?$filter=ActiviteitActor/any(a:a/ActorFractie eq 'GroenLinks') → @odata.count 14854. (13) No throttling observed: 8 rapid sequential requests all returned 200; response headers carry no X-RateLimit-*/Retry-After (headers seen: OData-Version, api-supported-versions: \"2.0, 3.0\", Content-Security-Policy, Set-Cookie TS01b46c01). (14) /OData/v4/3.0/$metadata → HTTP 404 despite api-supported-versions advertising 3.0. (15) /Verslag({id})/$value → HTTP 404 (must use /resource; both Verslag({id})/resource and Verslag/{id}/resource forms return 200). (16) Docs cross-checked on opendata.tweedekamer.nl/documentatie/odata-api and /documentatie/verslag: service root \"https://gegevensmagazijn.tweedekamer.nl/OData/v4/2.0\", 250-result cap documented, /resource documented, Soort enum {Eindpublicatie, Tussenpublicatie, Voorpublicatie}, Status enum {Casco, Gecorrigeerd, Gerectificeerd, Ongecorrigeerd}, VLOS source system start date 25-06-2013.",
+  "queryParams": [
+    {
+      "purpose": "freetext",
+      "param": "(NONE — no free-text search over speech text exists)",
+      "note": "CRITICAL: there is NO parameter that searches what members actually said. $search is accepted with HTTP 200 but SILENTLY IGNORED (proved: $count identical at 99117 with $search=klimaat, with $search=zzzznonsensexyz, and with no $search). $filter=contains(...) works but ONLY against metadata string columns (Activiteit/Onderwerp, Vergadering/Titel) — i.e. agenda-item subject lines, never the transcript body. Free-text over spoken words requires downloading the VLOS XML per meeting and indexing it in our own store."
+    },
+    {
+      "purpose": "freetext",
+      "param": "$filter=contains(Onderwerp,'...')",
+      "note": "Best available server-side text approximation, on Activiteit only. Verified: contains(Onderwerp,'klimaat') → 833 hits; case-INsensitive ('Klimaat' also 833). Also supports startswith()/endswith(). substringof() is NOT supported (HTTP 400). Use this only for topic pre-filtering, not as speech search."
+    },
+    {
+      "purpose": "date_from",
+      "param": "$filter=Vergadering/Datum ge 2026-01-01T00:00:00Z",
+      "note": "On Verslag, navigate the to-one relation with '/'. Edm.DateTimeOffset, unquoted literal. Verified in exampleRequest. Direct form on Vergadering itself: $filter=Datum ge 2026-01-01T00:00:00Z. Beware: stored offsets are Europe/Amsterdam (+02:00 in summer, +01:00 in winter), so a Z-anchored boundary can shift a sitting by a day."
+    },
+    {
+      "purpose": "date_to",
+      "param": "$filter=Vergadering/Datum le 2026-06-30T00:00:00Z",
+      "note": "Combine with 'and'. Note Vergadering.Datum is date-at-midnight (e.g. 2026-06-04T00:00:00+02:00) while Aanvangstijd/Sluiting carry real times — use 'le <date>T23:59:59' or the next day's midnight to avoid dropping the boundary sitting."
+    },
+    {
+      "purpose": "speaker",
+      "param": "$filter=ActiviteitActor/any(a:contains(a/ActorNaam,'Klaver'))",
+      "note": "PARTIAL/MISLEADING for speech attribution. ActiviteitActor lists scheduled participants of an Activiteit (Relatie observed: 'Deelnemer'; ActorNaam formatted as initials+surname, e.g. 'J.F. Klaver'; 1374 rows for Klaver), NOT who actually spoke in the transcript. Verified any() lambda syntax works (ActorFractie eq 'GroenLinks' → 14854). Real speaker attribution lives only in the XML at woordvoerder/spreker — filter it client-side after parsing."
+    },
+    {
+      "purpose": "party",
+      "param": "$filter=ActiviteitActor/any(a:a/ActorFractie eq 'GroenLinks')",
+      "note": "Same caveat as speaker. ActorFractie is a denormalized free-text label snapshot ('GroenLinks') that can disagree with the joined Fractie/Afkorting ('GL') on the same row — observed both on one record. In the XML, party is the plain <fractie> string inside <spreker>."
+    },
+    {
+      "purpose": "chamber",
+      "param": "$filter=Vergadering/Kamer eq 'Tweede Kamer'",
+      "note": "Edm.String on Vergadering. Observed value: 'Tweede Kamer'. NOTE the type trap: Vergadering.Kamer is Edm.String but Document.Kamer is Edm.Int32 — do not reuse the literal across entities."
+    },
+    {
+      "purpose": "term",
+      "param": "$filter=Vergadering/Vergaderjaar eq '2025-2026'",
+      "note": "Parliamentary session year as a quoted string, hyphenated, e.g. '2025-2026'. Also present on Activiteit. This is our 'term' field."
+    },
+    {
+      "purpose": "page",
+      "param": "$skip / $skiptoken",
+      "note": "$skip=<n> verified working ($skip=250 returned the expected next rows). For deep paging prefer following the server-issued @odata.nextLink, which uses $skiptoken=Id-<guid> (keyset paging, observed literally). Do not hand-craft $skiptoken."
+    },
+    {
+      "purpose": "size",
+      "param": "$top",
+      "note": "HARD CAP 250, enforced server-side. $top=250 → 200 OK/250 rows; $top=251 → HTTP 400 'The limit of 250 for Top query has been exceeded'. Same 250 cap applies inside $expand per the docs. Omitting $top also yields 250 + nextLink."
+    },
+    {
+      "purpose": "freetext",
+      "param": "$expand / $select / $orderby / $count / $format",
+      "note": "$expand=Vergadering verified (nested options in parens, separated by ';', e.g. $expand=Vergadering($select=Titel,Datum)). $orderby=Vergadering/Datum desc verified across the navigation. $count=true adds '@odata.count'; on the /$count path segment $top and $skip are ignored. $format=none recommended by docs in production to shrink payloads. ALWAYS add 'Verwijderd eq false' — deleted records persist as placeholders."
+    }
+  ],
+  "pagination": "Two mechanisms, both verified. (a) Offset: $top (max 250, hard 400 error above that) + $skip=<n>. (b) Server-driven keyset: omit $top (or exhaust a page) and the response carries \"@odata.nextLink\": \"https://gegevensmagazijn.tweedekamer.nl/OData/v4/2.0/Vergadering?$skiptoken=Id-e18c70d3-b159-4dd6-a4dd-08b1fc0383fa\" — follow it verbatim until absent. Total via $count=true → \"@odata.count\" (observed 50 on the example query, 23263 for all non-deleted Verslag). Recommended for our ingester: use nextLink/$skiptoken, because deep $skip over 23k rows is both slow and unstable under concurrent writes. Note the transcript payload itself is NOT paginated — /resource is one atomic 0.9–3 MB XML download, so Lambda memory and the 15-min timeout are the real constraints, not paging.",
+  "fieldMapping": [
+    {
+      "normalized": "title",
+      "sourcePath": "XML: vlosCoreDocument/vergadering/activiteit/titel (fallback .../activiteit/onderwerp); OData fallback: Verslag.Vergadering.Titel",
+      "note": "Prefer the per-activiteit title so each speech gets its real debate topic. Observed activiteit titles: 'Opening', 'Mededelingen', 'Hamerstukken'. The OData-level Vergadering.Titel is only a sitting label — observed '78e vergadering, donderdag 4 juni 2026' — usable as a coarse fallback but it is not a subject."
+    },
+    {
+      "normalized": "speaker",
+      "sourcePath": "XML: woordvoerder/spreker/verslagnaam (plus interrumpant/spreker/verslagnaam)",
+      "note": "verslagnaam is the clean Hansard-style rendering — observed 'Van Campen'. Sibling fields observed on the same <spreker>: voornaam='Thom', achternaam='Campen van' (surname is INVERTED/normalized, not display order), weergavenaam='Campen van', aanhef='De heer', functie='lid Tweede Kamer', and attribute soort='Tweede Kamerlid'. Use verslagnaam for display; build full name from voornaam + a de-inverted achternaam. Interjections are nested <interrumpant> INSIDE a <woordvoerder> — you must emit them as separate speech rows or you will attribute the interrupter's words to the floor holder (verified: 345 interrumpant vs 245 woordvoerder in one Eindpublicatie)."
+    },
+    {
+      "normalized": "party",
+      "sourcePath": "XML: woordvoerder/spreker/fractie",
+      "note": "Plain string, observed 'VVD', 'SGP', 'GroenLinks'. Historical label as-of the sitting, so it is correct point-in-time and should NOT be overwritten from current Persoon.Fractielabel. Empty/absent for non-member speakers (ministers, Chair acting ex officio). OData alternative ActiviteitActor.ActorFractie is scheduling metadata, not speech-level, and was observed disagreeing with the joined Fractie.Afkorting ('GroenLinks' vs 'GL')."
+    },
+    {
+      "normalized": "date",
+      "sourcePath": "OData: Verslag.Vergadering.Datum; precise per-speech time from XML woordvoerder/markeertijdbegin",
+      "note": "Vergadering.Datum observed '2026-06-04T00:00:00+02:00' — date at local midnight, use for the sitting date. markeertijdbegin observed '2026-07-02T10:15:09' — LOCAL, NO offset suffix, so you must attach Europe/Amsterdam explicitly before converting to UTC or every timestamp lands 1–2 h off. markeertijdeind gives duration."
+    },
+    {
+      "normalized": "chamber",
+      "sourcePath": "OData: Verslag.Vergadering.Kamer; XML: vergadering/@kamer",
+      "note": "Both observed literally 'Tweede Kamer'. Also carried on the XML vergadering element as attribute kamer=\"Tweede Kamer\". Map to our constant chamber='Tweede Kamer' / 'lower'. Use Vergadering.Soort ('Plenair' vs 'Commissie') to distinguish floor debates from committee sittings — this is the field that actually matters for scope."
+    },
+    {
+      "normalized": "term",
+      "sourcePath": "OData: Verslag.Vergadering.Vergaderjaar; XML: vergadering/vergaderjaar",
+      "note": "Observed '2025-2026' in both. Dutch parliamentary year runs Sept→Sept, so it does NOT equal a calendar year and must be stored verbatim, not derived from date."
+    },
+    {
+      "normalized": "sessionRef",
+      "sourcePath": "OData: Verslag.Vergadering.VergaderingNummer + Vergaderjaar; XML: activiteit/parlisid",
+      "note": "Compose the sitting reference as e.g. '2025-2026/78' (observed VergaderingNummer=78, Vergaderjaar='2025-2026'; XML equivalents vergaderingnummer/vergaderjaar). For the finer-grained agenda-item reference use XML activiteit/parlisid — observed '2026A05269', '2026Z03566' — which is the ONLY verified working join back into OData: /Activiteit?$filter=Nummer eq '2026A05269' returned Id=61d086d2-d795-44e5-b149-9c40ecfb893c. Note parlisid is sometimes an empty element (<parlisid />)."
+    },
+    {
+      "normalized": "snippet",
+      "sourcePath": "XML: woordvoerder/tekst/alinea/alineaitem (concatenate, in document order)",
+      "note": "The actual spoken words. tekst → 1..n <alinea> → 1..n <alineaitem>; join alineaitem with spaces and alinea with newlines. Inline <nadruk type=\"Vet\"> must be stripped to text. Gotcha: the first alineaitem is usually a redundant speaker prefix ('De <nadruk>voorzitter</nadruk>:') that should be dropped to avoid polluting embeddings. Procedural narration also appears in <draadboekfragment> (258 in one report) which has tekst but NO spreker — decide explicitly whether to index those as unattributed."
+    },
+    {
+      "normalized": "sourceUrl",
+      "sourcePath": "CONSTRUCTED: https://gegevensmagazijn.tweedekamer.nl/OData/v4/2.0/Verslag/{Verslag.Id}/resource",
+      "note": "UNVERIFIED for a human-facing deep link — no citizen-readable per-debate URL was confirmed. I probed three plausible www.tweedekamer.nl patterns and ALL returned 404: /kamerstukken/plenaire_verslagen/detail/2026-2026/90, /debat_en_vergadering/plenaire_vergaderingen/details?id={guid}, /kamerstukken/verslagen/detail?id={guid}. Only the section index https://www.tweedekamer.nl/debat_en_vergadering/plenaire_vergaderingen returned 200. Ship the API /resource URL as a stable machine-resolvable citation; to give users a readable page we would need to either scrape the plenaire_vergaderingen index to learn the real slug scheme, or cite the KOOP Handelingen record via zoek.officielebekendmakingen.nl (also unverified — my probe of its /resultaten search returned HTTP 400)."
+    },
+    {
+      "normalized": "docId",
+      "sourcePath": "OData: Verslag.Id (+ XML woordvoerder/@objectid for the speech-level id)",
+      "note": "Verslag.Id is an Edm.Guid, observed '4807aa73-3938-4c37-90da-8c1891e39169', and is the correct document-level primary key. For per-speech ids use woordvoerder/@objectid (observed '9aaa2fe1-7707-4924-b582-67aae8b99833') or interrumpant/@objectid — but treat these as XML-LOCAL ONLY: they are NOT resolvable OData keys (see gotchas). Recommended stable composite: {Vergadering_Id}:{parlisid}:{woordvoerder objectid}. Do NOT key on Verslag.Id alone, because one sitting yields up to 10 Verslag rows."
+    },
+    {
+      "normalized": "language",
+      "sourcePath": "HARDCODE 'nl'",
+      "note": "No language field anywhere in the OData model or the VLOS XML. All transcript content observed is Dutch. Only Fractie carries a translated attribute (NaamEN) — the debates themselves are nl-only. Frisian-language contributions do occasionally occur in the Tweede Kamer and would be silently tagged 'nl'."
+    }
+  ],
+  "fullTextAccess": "Separate endpoint, whole-meeting XML blob — CONFIRMED, and this is the central integration cost. The OData rows for Verslag contain ZERO speech text: the entity has only Id, Soort, Status, ContentType, ContentLength, GewijzigdOp, ApiGewijzigdOp, Verwijderd, Vergadering_Id. To get spoken words you must GET https://gegevensmagazijn.tweedekamer.nl/OData/v4/2.0/Verslag/{Id}/resource which returns Content-Type text/xml, one <vlosCoreDocument Source=\"VLOS2.0\" xmlns=\"http://www.tweedekamer.nl/ggm/vergaderverslag/v1.0\"> per ENTIRE SITTING (observed 942 KB for a corrected final report, 2.24 MB and 3.03 MB for interim ones). Note the entity is NOT declared HasStream in $metadata (zero HasStream entities), and /$value returns 404 — /resource is the only path (both Verslag({id})/resource and Verslag/{id}/resource work). Structure: vlosCoreDocument → vergadering → activiteit(@soort,@objectid) → activiteithoofd → activiteitdeel → activiteititem → woordvoerder(→ spreker, markeertijdbegin/eind, isvoorzitter, isdraad, tekst) with <interrumpant> nested inside woordvoerder for interjections, plus <draadboekfragment> for procedural narration and <stemmingen>/<stemming>/<stem> for votes (out of our scope — filter these out). One report yielded 245 woordvoerder + 345 interrumpant + 838 spreker elements. Practical consequence: we must build a bulk ingest + XML parse + own full-text/vector index. Sizing from live counts: 23263 non-deleted Verslag rows total, of which 1458 are Soort='Eindpublicatie'; ingesting only final plenary reports is roughly 1458 × ~1 MB ≈ 1.5 GB of XML — a one-off backfill job, then incremental via ApiGewijzigdOp or the SyncFeed API (https://gegevensmagazijn.tweedekamer.nl/SyncFeed/2.0/Feed?category=Verslag, root returned HTTP 200). This will not fit a naive synchronous Lambda-per-query design.",
+  "languages": "Dutch (nl) only. No language field exists in either the OData model or the VLOS XML, so language must be hardcoded. Metadata labels/enums are Dutch too (Soort='Eindpublicatie', Status='Gecorrigeerd', Kamer='Tweede Kamer'), and filter literals must be the Dutch strings. The single English artifact in the whole model is Fractie.NaamEN (party name); there is no English transcript, no translated titles, and no bilingual variant of any endpoint. Frisian may occasionally be spoken and would be indistinguishable from Dutch in the data.",
+  "rateLimits": "No documented and no observed rate limiting — but treat as UNVERIFIED at scale. Observed: 8 rapid sequential requests all returned HTTP 200 with no 429 and no backoff; response headers contain NO X-RateLimit-*, no Retry-After, no Retry hints (full header set seen: HTTP/1.1 200 OK, Content-Type, OData-Version: 4.0, api-supported-versions: \"2.0, 3.0\", Content-Security-Policy, Date, Set-Cookie TS01b46c01=..., Transfer-Encoding: chunked). The official /documentatie/odata-api page states no throttling rules; the only load-control mechanism it documents is the 250-result page cap, explicitly justified as \"Om de belasting van individuele queries op het Gegevensmagazijn te minimaliseren\". The portal's introduction page does reference a disclaimer (https://opendata.tweedekamer.nl/disclaimer) about keeping access open for everyone and ensuring \"een stabiele verbinding\", which implies fair-use expectations without numeric limits. The Set-Cookie is from a BIG-IP/ASM-style front end (TS-prefixed cookie), which commonly fronts WAF rules that can shed aggressive traffic — so a 1458-file backfill hammering /resource could plausibly trip protections I did not exercise. Recommendation: serial or max 2 concurrent requests, ~200-500 ms delay between calls, exponential backoff on 429/403/503, a descriptive User-Agent with contact info, and run the bulk backfill off-peak; prefer the SyncFeed API for incremental sync rather than repolling OData.",
+  "gotchas": [
+    "DEALBREAKER FOR 'ready': there is NO free-text search over what members said. $search is accepted and returns HTTP 200 but is SILENTLY IGNORED — proven three ways: /Activiteit/$count = 99117, /Activiteit/$count?$search=klimaat = 99117, /Activiteit/$count?$search=zzzznonsensexyz = 99117. A naive implementation would look like it works while returning arbitrary unfiltered rows. Never use $search against this API.",
+    "contains() only reaches metadata, never transcripts. contains(Onderwerp,'klimaat') → 833 hits, but Onderwerp is an agenda-item subject line. No OData field anywhere holds speech text, so keyword search over debates MUST be done in our own index after parsing the XML.",
+    "Massive Verslag duplication per sitting — dedup is mandatory. Vergadering_Id 67d1ec85-98ce-4da0-adfc-462cdf5963fd has 10 non-deleted Verslag rows, ALL ('Tussenpublicatie','Ongecorrigeerd'), with ContentLength growing 2242856 → 3028259 as the sitting progressed: these are successive live snapshots of the same debate, not distinct documents. Ingesting Verslag naively multiplies every speech ~10x. Select one row per Vergadering_Id: prefer Soort='Eindpublicatie', else the max GewijzigdOp.",
+    "Only 1458 of 23263 Verslag rows are Eindpublicatie. If you filter to final corrected reports you get clean text but LOSE recent debates (final versions lag — a 4 June 2026 sitting was only finalized 31 July 2026, ~8 weeks). If you include Tussenpublicatie/Voorpublicatie you get near-live coverage but with Status 'Casco'/'Ongecorrigeerd' text that is incomplete or later revised. Store Soort+Status per record and surface an 'uncorrected' caveat.",
+    "EVERY GUID inside the XML is XML-local and 404s against OData. Verified: 6 spreker/@objectid → Persoon(...) all 404; 5 activiteit/@objectid → Activiteit(...) all 404; and vergadering/@objectid=65fe4eec-8e2e-455b-b17b-78d37cc111f8 → Vergadering(...) 404 even though the parent Verslag's Vergadering_Id=67d1ec85-... resolves 200. Do NOT build joins on XML objectids. The only verified bridge is XML <parlisid> → /Activiteit?$filter=Nummer eq '<parlisid>' (2026A05269 → Id 61d086d2-...), and parlisid is sometimes empty (<parlisid />).",
+    "Linking a speaker to a Persoon record requires fuzzy name matching, which will misattribute. There is no usable person id in the transcript, and the XML surname is inverted: spreker/achternaam='Campen van', voornaam='Thom'. Persoon stores these split as Achternaam='Campen' + Tussenvoegsel='van' + Roepnaam='Thom'. Verified failure: /Persoon?$filter=Achternaam eq 'Campen van' → 0 rows; Achternaam eq 'Campen' → 1 row (Id bf494e35-c009-4c74-a5c6-3cb2cd26bb51). You must strip/split the tussenvoegsel. Dutch politics also has many same-surname MPs (the attendance list shows 'Martin Bosma', 'Heera Dijk', 'Jimmy Dijk', 'Diederik van Dijk', 'Emiel van Dijk', 'Inge van Dijk'), so surname-only matching is unsafe — disambiguate with the <fractie> label and the sitting date.",
+    "Interjections are NESTED, not siblings: <interrumpant> appears INSIDE <woordvoerder>. A naive 'iterate woordvoerder, take tekst' parse attributes the interrupter's words to the floor holder. One Eindpublicatie had 345 interrumpant vs 245 woordvoerder — the majority of speech acts are interjections. Emit them as their own rows with their own spreker.",
+    "Timestamps mix two conventions. OData returns explicit offsets (Datum '2026-06-04T00:00:00+02:00'), but XML markeertijdbegin/markeertijdeind and <datum> have NO offset ('2026-07-02T10:15:09') and are Europe/Amsterdam local. Parsing those as UTC shifts every speech 1–2 h and can move it across a date boundary. Likewise a Z-anchored $filter date range can include/exclude the wrong sitting since Datum is local midnight.",
+    "$top is hard-capped at 250 and EXCEEDING IT IS A 400, NOT A CLAMP. $top=251 and $top=5000 both → HTTP 400 'The limit of 250 for Top query has been exceeded'. The docs mention the 250 default but do not state that a larger $top errors. Any code that computes a page size from a caller-supplied limit must clamp to 250 or it will hard-fail.",
+    "Guess-free filtering only: Soort enums are exact Dutch strings and wrong guesses return an empty set with HTTP 200, not an error. I burned real queries on this — Activiteit Soort 'Plenaire vergadering' → 0 rows and 'Plenair debat' → 0 rows, while Vergadering Soort 'Plenair' → 1394 rows. Silent empty results are the dominant failure mode; assert non-empty in tests.",
+    "Always append 'Verwijderd eq false'. Deleted entities are retained as placeholders (documented and modelled on every entity), so unfiltered queries return tombstones with null-ish content.",
+    "Type inconsistency across entities: Vergadering.Kamer is Edm.String ('Tweede Kamer') but Document.Kamer is Edm.Int32. Reusing a chamber literal across entities produces a 400.",
+    "Advertised API version 3.0 does not exist. Response header says api-supported-versions: '2.0, 3.0', but https://gegevensmagazijn.tweedekamer.nl/OData/v4/3.0/$metadata → HTTP 404. Pin the path to /OData/v4/2.0.",
+    "/$value is not supported — Verslag({id})/$value → 404 with application/problem+json. Use /resource. The entity is not declared HasStream, so generic OData client libraries will not offer a media-read helper; issue a plain GET.",
+    "Official docs carry a self-declared staleness warning ('Deze documentatie kan nog oude informatie bevatten') because the OData API was updated and attributes renamed. Trust live $metadata over the documentation pages.",
+    "No verified human-readable permalink for a debate — three www.tweedekamer.nl URL patterns all 404 (see sourceUrl mapping). Citations will point at raw API URLs unless we invest in resolving the public slug scheme or the KOOP Handelingen record.",
+    "Coverage starts 2013-06-25 (earliest Vergadering: '99e vergadering, dinsdag 25 juni 2013'), matching the documented VLOS source-system start date. Transcripts before mid-2013 are NOT in this API — pre-2013 Handelingen would have to come from KOOP/officielebekendmakingen. Committee sittings are also present (Vergadering.Soort='Commissie', e.g. 'Procedurevergadering') and are often Status='Casco' shells, so filter on Soort='Plenair' if we only want floor debates.",
+    "The transcript payload is not paginated and not partially fetchable: /resource is atomic, up to ~3 MB of XML per sitting, ~1.5 GB for a full Eindpublicatie backfill. Combined with XML parsing this does not fit a synchronous per-query Lambda; it needs an async ingest job plus stored index, with incremental refresh via ApiGewijzigdOp or SyncFeed (https://gegevensmagazijn.tweedekamer.nl/SyncFeed/2.0/Feed?category=Verslag, returned HTTP 200)."
+  ],
+  "confidence": "high"
+}

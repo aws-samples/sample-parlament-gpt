@@ -1,0 +1,8 @@
+node_modules/
+*.js
+*.d.ts
+# Negations must live HERE: a nested .gitignore's `*.js` overrides any negation in the
+# repo-root .gitignore, which silently dropped jest.config.js from fresh clones/syncs.
+!jest.config.js
+cdk.out/
+.cdk.staging/

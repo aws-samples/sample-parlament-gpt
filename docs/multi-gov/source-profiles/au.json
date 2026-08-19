@@ -1,0 +1,195 @@
+{
+  "countryKey": "au",
+  "displayName": "Australia (Commonwealth Parliament)",
+  "verdict": "workable",
+  "hasLiveQueryApi": true,
+  "sourceName": "Parliament of Australia (APH) Hansard — \"Search Hansard\" GET-addressable search + undocumented /api/hansard/transcript JSON endpoint",
+  "hosts": [
+    "www.aph.gov.au",
+    "parlinfo.aph.gov.au"
+  ],
+  "protocol": "HTTPS. Two-step: (1) HTML search over GET query string at www.aph.gov.au (ASP.NET WebForms page that also accepts GET params — returns server-rendered HTML result list, must be parsed); (2) JSON GET at www.aph.gov.au/api/hansard/transcript for the actual verbatim speech text. Step 2 returns application/json; charset=utf-8. NOT REST/OData — no JSON search. parlinfo.aph.gov.au is only needed for PDF/XML artefacts and is behind an Azure WAF JS challenge (see gotchas).",
+  "auth": "none. No API key, no token, no registration. Both endpoints answered anonymously. A browser-like User-Agent is required — the default curl UA gets 403 on some paths; \"Mozilla/5.0 ... Chrome/125.0 Safari/537.36\" worked for every call. robots.txt is permissive (\"Allow: /\"; only disallows /News_and_Events/Events_Calendar*, /News_and_Events/watch_parliament, CreateCalendarAppt.aspx) — neither /Parliamentary_Business/Hansard/Search nor /api/hansard/* is disallowed. Content licence: CC BY-NC-ND 3.0 AU, Commonwealth of Australia (declared in DCTERMS.license meta on Hansard pages) — the NC/ND terms are a real constraint for a public product.",
+  "searchEndpoint": "GET /Parliamentary_Business/Hansard/Search (search, HTML) and GET /api/hansard/transcript?id={SystemId} (full text, JSON), both on www.aph.gov.au",
+  "exampleRequest": "https://www.aph.gov.au/Parliamentary_Business/Hansard/Search?q=climate%20change&hto=0&ps=25&drt=1&drv=0&drvH=0&f=01%2F01%2F2026&to=30%2F06%2F2026&chi=2&pi=0&coi=0&st=1&page=1",
+  "verified": true,
+  "verificationNote": "Executed with curl (browser UA). The example request returned HTTP 200, 236,475 bytes, 25 parsed results, \"Last page\" = 18. Real observed results: \"Federation Chamber;CONSTITUENCY STATEMENTS;Cost of Living - 30 Jun 2026\" (CHAMBER=House of Representatives, PARL NO=48, DATE=30 Jun 2026, docId chamber/hansardr/29169/0202); \"QUESTIONS WITHOUT NOTICE;Energy - 30 Jun 2026\" (docId chamber/hansardr/29169/0104). Then GET https://www.aph.gov.au/api/hansard/transcript?id=chamber/hansardr/29164/0278 returned HTTP 200, 8,616 bytes JSON with Speaker=\"Chalmers, Jim MP\", Chamber=\"House of Representatives\", Date=\"22/06/2026\", ParlNo=\"48\", Context=\"BILLS\", Status=\"Proof\", MainTitle=\"BILLS - Treasury Laws Amendment (Fuel Excise Relief No. 2) Bill 2026 - Second Reading\", and TalkText 7,582 chars of real verbatim speech beginning \"Dr CHALMERS (Rankin—Treasurer) (15:10): I move: That this bill be now read a second time. Today the Albanese Labor government is introducing...\". Filters verified independently: chi=1 returned Senate-only rows; drt=1 with f=01/02/2026&to=28/02/2026 returned only 04-05 Feb 2026 dates; f=01/01/2015&to=31/12/2015 returned only 2015 dates; pi=2&pv=Chalmers narrowed 25 rows to 14 all-Chalmers rows; hto=1 (title-only) gave 2 hits vs 25 for full-text on the same query. Historical reach confirmed: f=01/01/1901&to=31/12/1910 returned 798 pages of 1901-1910 results. The /api/hansard/transcript endpoint was discovered by reading https://www.aph.gov.au/js/apps/hansard-display/HansardDisplay.js line 243 ($.get(\"/api/hansard/transcript\", { id: bid + sid }, ...)), i.e. it is the site's own AJAX call, not guessed. BLOCKED/UNVERIFIED: every parlinfo.aph.gov.au URL (ParlInfo summary.w3p search, display.w3p, and the toc_unixml XML / toc_pdf downloads) returned HTTP 403 with an \"Azure WAF JS Challenge\" body under both curl and WebFetch, with and without cookie jar and Referer.",
+  "queryParams": [
+    {
+      "purpose": "freetext",
+      "param": "q",
+      "note": "VERIFIED. Free-text keywords, URL-encoded (space as %20 or +). Pair with hto to control scope. NOTE: q is effectively mandatory — a request with pi=2&pv=Chalmers and no q returned 0 results, as did no-q browse of Parl 48. There is no way to page a whole date range without a keyword."
+    },
+    {
+      "purpose": "freetext",
+      "param": "hto",
+      "note": "VERIFIED, CRITICAL DEFAULT TRAP. 'Hansard title only'. The site's form ships this CHECKED (hto=1), so q matches titles ONLY unless you send hto=0. On q=submarine, chi=2, Jan-Jun 2026: hto=1 -> 2 results; omitting hto -> 25 results, 2 pages. Always send hto=0 for real full-text search of spoken words."
+    },
+    {
+      "purpose": "date_from",
+      "param": "f",
+      "note": "VERIFIED. Format dd/mm/yyyy, must be URL-encoded (01%2F02%2F2026). ONLY honoured when drt=1. With drt=2 the f/to values are silently ignored and results come from the pnu parliament instead — a Feb-2026 f/to range under drt=2 returned Jul 2026 rows."
+    },
+    {
+      "purpose": "date_to",
+      "param": "to",
+      "note": "VERIFIED. Format dd/mm/yyyy URL-encoded. Same drt=1 requirement as f."
+    },
+    {
+      "purpose": "term",
+      "param": "drt",
+      "note": "VERIFIED. Period mode selector: drt=1 = custom date range (uses f/to and drv), drt=2 = by Parliament number (uses pnu). Set drt=1 for date-window ingestion."
+    },
+    {
+      "purpose": "date_from",
+      "param": "drv",
+      "note": "VERIFIED (option list read from form). Relative date preset used with drt=1: 0=None, 1=Yesterday, 2=Today, 3=Current Year, 4=Last Year, 5=Current Session, 6=Last Parliament, 7=Current Parliament. Send drv=0 (plus drvH=0) so that explicit f/to win."
+    },
+    {
+      "purpose": "date_from",
+      "param": "drvH",
+      "note": "Hidden echo field for drv that the WebForms page posts back; send drvH=0 alongside drv=0. Sending it caused no harm in verified calls."
+    },
+    {
+      "purpose": "term",
+      "param": "pnu",
+      "note": "VERIFIED. Parliament number, used when drt=2. Observed option values 0 (=All) and 28..48; 48 is the current Parliament as of the observed page. Maps directly to normalized 'term'."
+    },
+    {
+      "purpose": "term",
+      "param": "pnuH",
+      "note": "Hidden echo field for pnu; mirror the pnu value."
+    },
+    {
+      "purpose": "chamber",
+      "param": "chi",
+      "note": "VERIFIED (option list read from form; chi=1 and chi=2 confirmed by observed rows). 0=All, 1=Senate, 2=House of Representatives, 3=Main Committee (Federation Chamber), 4=Joint Committees, 5=Estimates, 6=All other Committees. Use chi=1 and chi=2 to stay on the floor and exclude committee hearings."
+    },
+    {
+      "purpose": "speaker",
+      "param": "pi",
+      "note": "VERIFIED. Selects WHICH person role pv is matched against: 0=All, 1=Author, 2=Speaker, 3=Reporter, 4=Presenter, 5=Questioner, 6=Responder. Use pi=2 for the person who spoke."
+    },
+    {
+      "purpose": "speaker",
+      "param": "pv",
+      "note": "VERIFIED. The person-name value matched under the pi role. Substring surname works: pi=2&pv=Chalmers narrowed 25 rows to 14 rows all attributed to Chalmers. pv is ignored/yields 0 results without a q."
+    },
+    {
+      "purpose": "freetext",
+      "param": "coi",
+      "note": "VERIFIED (option list read from form). Debate-context filter: 0=All, 1=Questions without notice, 2=Bills, 3=Adjournment, 4=Petitions, 5=Constituency statements, 6=Statements by members, 7=Matters of public importance, 8=Ministerial statement, 9=Condolences. Useful to isolate genuine floor speech types."
+    },
+    {
+      "purpose": "size",
+      "param": "ps",
+      "note": "VERIFIED. Page size; allowed values are exactly 10, 25, 50, 100. ps=100 confirmed returning 100 parsed rows in one response. 100 is the hard max."
+    },
+    {
+      "purpose": "page",
+      "param": "page",
+      "note": "VERIFIED. 1-based page number. page=1 is the first page; the response exposes a 'Last page' anchor carrying the max page number."
+    },
+    {
+      "purpose": "freetext",
+      "param": "st",
+      "note": "VERIFIED as sort. st=1 (date, as used by the default result list), st=2 and st=3 appear in the page's own sort-control links (st=3 labelled 'Chamber'). Send st=1 for stable date ordering."
+    },
+    {
+      "purpose": "freetext",
+      "param": "sr",
+      "note": "Sort-direction/reverse companion to st, seen as a hidden input (value 0) and in generated sort links (sr=0/sr=1). Optional; omit or send sr=0."
+    },
+    {
+      "purpose": "freetext",
+      "param": "id",
+      "note": "VERIFIED. Parameter of the SECOND endpoint, /api/hansard/transcript?id=... . Value is the SystemId, i.e. bid+sid concatenated with no separator, e.g. chamber/hansardr/29164/0278. Send it unencoded (slashes literal) — that is what the site's own JS does and what returned 200."
+    }
+  ],
+  "pagination": "Classic offset paging by page number on the search HTML. Send &page=N with &ps={10|25|50|100}. The response body contains an anchor `<a href=\"?page=225&...\", title=\"Last page\">`, so total page count is scraped from that (regex on `page=(\\d+)[^\"]*\" title=\"Last page\"`); there is no numeric total-results field anywhere in the HTML. Observed: the verified example gave last page = 18 at ps=25; q=housing/Feb-2026 gave 5; q=tariff/1901-1910 gave 798 (~19,950 items at ps=25). Max throughput is 100 rows/request. Practical ingestion loop: fix a narrow f/to window + chi, request page=1 to learn the last page, then walk pages 1..N at ps=100. Beware very deep result sets — prefer slicing by month/chamber over paging past a few hundred pages. Pagination on /api/hansard/transcript does not apply (single document per id).",
+  "fieldMapping": [
+    {
+      "normalized": "title",
+      "sourcePath": "search HTML: li > p.title > a (text)  |  transcript JSON: MainTitle",
+      "note": "VERIFIED. Search-list title is a semicolon-joined breadcrumb plus a trailing date, e.g. 'BILLS;Treasury Laws Amendment (Fuel Excise Relief No. 2) Bill 2026;Second Reading - 22 Jun 2026' or 'QUESTIONS WITHOUT NOTICE;Energy - 30 Jun 2026'. The JSON MainTitle is the cleaner canonical form with ' - ' separators: 'BILLS - Treasury Laws Amendment (Fuel Excise Relief No. 2) Bill 2026 - Second Reading'. Prefer MainTitle; split on ' - ' to recover debate/sub-debate levels."
+    },
+    {
+      "normalized": "speaker",
+      "sourcePath": "transcript JSON: Speaker (fallback: Presenter, Questioner, Responder)",
+      "note": "VERIFIED but ONLY on the transcript endpoint — the search result list carries NO speaker field at all, so resolving speaker costs one extra request per item. Format is inconsistent across eras and chambers: 'Chalmers, Jim MP', 'Wong, Sen Penny', 'Crean, Simon, MP' (extra comma), 'Mr ROCHER', 'SMITH, Sydney'. Requires a normalizer. Speaker can be null even when text exists; for QT-style items the person may instead be in Questioner/Responder/Presenter. Richer attribution is inside TalkText: <a href='/Senators_and_Members/Parliamentarian?MPID=37998' type='MemberSpeech'> plus <span class='HPS-MemberSpeech'>Dr CHALMERS</span>, <span class='HPS-Electorate'>Rankin</span>, <span class='HPS-MinisterialTitles'>Treasurer</span>, <span class='HPS-Time'>15:10</span> — parse these for surname, electorate, portfolio and spoken time."
+    },
+    {
+      "normalized": "party",
+      "sourcePath": "NOT AVAILABLE in either endpoint — derive via MPID",
+      "note": "UNVERIFIED AS A FIELD / effectively absent. Neither the search HTML nor the transcript JSON contains a party field; I inspected all 22 JSON keys and there is no party. TalkText yields only electorate and ministerial title. The only path is the MPID in the TalkText anchor (MPID=37998) -> scrape https://www.aph.gov.au/Senators_and_Members/Parliamentarian?MPID={id}, whose HTML does contain 'Australian Labor Party' (I fetched it, HTTP 200, 64,849 bytes) but as unstructured biography prose mixed with branch/committee history, not a clean field. I probed /api/parliamentarian/{id} and /api/parliamentarian/{id}/details — both 404 (only /api/parliamentarian/{id}/image exists). Recommendation: build a one-off MPID->party lookup table rather than resolving party per speech."
+    },
+    {
+      "normalized": "date",
+      "sourcePath": "transcript JSON: Date  |  search HTML: dl > dt 'DATE' + dd",
+      "note": "VERIFIED. JSON Date is d/m/yyyy or dd/mm/yyyy and is NOT zero-padded consistently — observed '22/06/2026' but also '8/10/2025' and '8/12/2005'. Parse day-first and tolerate 1-2 digit day/month. Search HTML gives a friendlier '30 Jun 2026'. Neither is ISO — normalize to ISO-8601 yourself."
+    },
+    {
+      "normalized": "chamber",
+      "sourcePath": "transcript JSON: Chamber  |  search HTML: dl > dt 'CHAMBER' (or 'COMMITTEES') + dd",
+      "note": "VERIFIED. Observed values 'House of Representatives' and 'Senate'. Gotcha: for committee items the search HTML <dt> label is 'COMMITTEES' (not 'CHAMBER') and the <dd> is e.g. 'Senate Committee Hansard' — so key off the dd value, not the dt label. Also note Federation Chamber (House second chamber) sittings appear with CHAMBER='House of Representatives' and the title prefixed 'Federation Chamber;' — detect that prefix if you need to distinguish it."
+    },
+    {
+      "normalized": "term",
+      "sourcePath": "transcript JSON: ParlNo  |  search HTML: dl > dt 'PARL NO' + dd",
+      "note": "VERIFIED. Parliament number as a string, e.g. '48' for 2026 sittings, '43' for 2010, '41' for 2005, '1' for 1903. Round-trips with the pnu query param."
+    },
+    {
+      "normalized": "sessionRef",
+      "sourcePath": "derive from docId path segment 2 (the sitting-day/volume id), plus transcript JSON Status",
+      "note": "PARTIAL. There is no explicit session field. The docId's second-to-last segment identifies the sitting-day document and is the best sessionRef proxy: '29164' in chamber/hansardr/29164/0278, or a date '2010-11-25', or a GUID '683c1920-c818-4261-b4de-1e254801ee9a' for ~2011-2021. Carry Status alongside it: VERIFIED values 'Proof' (uncorrected, recent sittings — text may still change) and 'Final'. Re-fetch anything marked Proof."
+    },
+    {
+      "normalized": "snippet",
+      "sourcePath": "NOT PROVIDED — generate locally from TalkText",
+      "note": "VERIFIED ABSENT. The search result HTML contains no keyword-in-context snippet (I confirmed zero 'snippet' occurrences and inspected the full <li> markup: it is only title, PDF/ParlInfo/XML action links, and a CHAMBER/PARL NO/DATE/FULL definition list). You must fetch the transcript, strip TalkText HTML, and cut your own snippet around the query term."
+    },
+    {
+      "normalized": "sourceUrl",
+      "sourcePath": "https://www.aph.gov.au/Parliamentary_Business/Hansard/Hansard_Display?bid={bid}&sid={sid}  |  search HTML: li > p.title > a[href] (modern) or the parlinfo display.w3p link (pre-~2011)",
+      "note": "VERIFIED, and it CHANGES BY ERA. For modern items the title anchor is a relative APH link, e.g. /Parliamentary_Business/Hansard/Hansard_Display?bid=chamber/hansardr/29164/&sid=0278 — prefix https://www.aph.gov.au. For pre-~2011 items the title anchor is instead an absolute parlinfo URL, e.g. https://parlinfo.aph.gov.au/parlInfo/search/display/display.w3p;query=Id%3A%22hansard80%2Fhansardr80%2F1903-10-22%2F0004%22. Your parser must handle both shapes. Note the human-facing Hansard_Display page is a Knockout.js shell: the HTML I fetched (245,910 bytes) contained ZERO speech text — 'Second Reading', 'Fuel Excise' and 'I move' all had 0 occurrences. Never scrape that page for content; use /api/hansard/transcript."
+    },
+    {
+      "normalized": "docId",
+      "sourcePath": "transcript JSON: SystemId  |  search HTML: bid+sid from the title href, or Id%3A%22...%22 in the ParlInfo link",
+      "note": "VERIFIED. Canonical stable id, e.g. 'chamber/hansardr/29164/0278' (House), 'chamber/hansards/29225/0010' (Senate), 'committees/commsen/29668/0001' (Senate committee), 'hansard80/hansardr80/1903-10-22/0004' (historic). Structure is {collection}/{series}/{sittingDoc}/{fragmentSid}. Build it as bid+sid concatenated with NO separator (bid already ends in '/'), which is exactly the id /api/hansard/transcript expects. From the ParlInfo link, extract the Id%3A%22...%22 capture and replace %2F with '/'."
+    },
+    {
+      "normalized": "language",
+      "sourcePath": "constant 'en-AU' (corroborated by DCTERMS.language meta = 'en-AU')",
+      "note": "VERIFIED as a page-level constant, not a per-record API field. Hardcode 'en'/'en-AU'. Australian federal Hansard is English; occasional First Nations or foreign-language passages appear inline in TalkText, usually with an English translation, and are not separately tagged."
+    }
+  ],
+  "fullTextAccess": "Verbatim text comes from a SECOND request: GET https://www.aph.gov.au/api/hansard/transcript?id={SystemId}, returning JSON whose TalkText field holds the speech as HTML (semantic HPS-* classes: HPS-MemberSpeech, HPS-Electorate, HPS-MinisterialTitles, HPS-Time, HPS-Normal, HPS-Small). Confirmed 7,582 chars of real floor speech for chamber/hansardr/29164/0278 and 9,836 chars for a Senate item. Strip tags for plain text, or keep the markup to extract speaker/electorate/timestamp. Related fields DebateText, SubDebateText, BusinessText, Answer, Questioner, Title were null on every record I inspected — do not depend on them. So: search does NOT return text, one extra HTTP call per speech is mandatory (N+1). MAJOR LIMITATION — full text is modern-only: TalkText was EMPTY (null, 0 chars) for every pre-2011 record I tested (1985, 1990, 1995, 1998, 2000, 2005, 2010) even though metadata (Speaker, Chamber, Date, ParlNo, MainTitle) came back fine; it was populated for 2011, 2012, 2013, 2014, 2015, 2016, 2018, 2020, 2022 and 2025-2026. So the practical full-text corpus via this API starts ~2011. Search INDEXING, by contrast, reaches back to 1901 (a 1901-1910 query returned 798 pages), so you can find and cite old speeches but cannot retrieve their words this way. For pre-2011 text the only official artefacts are the parlinfo.aph.gov.au PDF (genpdf/.../hansard_frag.pdf) and per-sitting-day XML (download/.../toc_unixml/....xml) linked from each record — and BOTH are currently WAF-blocked (403) from this environment, so pre-2011 full text is UNVERIFIED and likely needs a headless browser or the historichansard.net mirror (root and /search/ returned 200; it covers 1901-1980 but is a community site, not official, and exposes no API — /api/ 404s).",
+  "languages": "English (en-AU) only. Confirmed by DCTERMS.language='en-AU' on Hansard pages and by all observed transcript text. No multilingual variants; no language query parameter and no per-record language field, so treat language as the constant 'en'.",
+  "rateLimits": "No published rate limits, quotas, or terms-of-use page for either endpoint — because /api/hansard/transcript is an undocumented internal AJAX endpoint, there is no contract at all. UNVERIFIED: I did not stress-test concurrency, so the real throttle is unknown. Empirically ~25 sequential requests across search + transcript calls all returned 200 with no 429 and no visible throttling. Crucially, www.aph.gov.au served every request while parlinfo.aph.gov.au returned Azure WAF 403s — the same WAF fronts the estate, so aggressive parallel crawling risks tripping a JS challenge on the hosts you depend on. Recommend serial or low concurrency (<=2), a browser-like User-Agent, a Referer of https://www.aph.gov.au/, 200-500ms spacing, retry-with-backoff on 403 (treat 403 as WAF, not auth failure), and caching transcripts by docId since they are immutable once Status='Final'.",
+  "gotchas": [
+    "NOT AN API — the search half is HTML scraping of an ASP.NET WebForms page. It happens to accept GET query params (the page's own JS does form.method='get'), but the response is server-rendered HTML with ids like main_0_content_0_lvResults_hlTitle_0. There is no JSON, no XML, no OData, no result-count field, and no stability contract. A CMS redesign or a WebForms upgrade silently breaks every selector. This is the single biggest reason the verdict is 'workable', not 'ready'.",
+    "hto DEFAULT TRAP: the form ships 'Hansard title only' CHECKED (hto=1), so q matches titles only. Verified: q=submarine gave 2 results with hto=1 vs 25 (2 pages) without. You MUST send hto=0 to search what members actually said. Getting this wrong silently returns a tiny, wrong corpus that still looks like valid results.",
+    "drt SILENTLY IGNORES DATES: f/to are honoured ONLY when drt=1. With drt=2 (Parliament-number mode) my Feb-2026 f/to window returned Jul 2026 rows — no error, no warning, just the wrong date range. Always send drt=1&drv=0&drvH=0 for date-window ingestion.",
+    "FULL TEXT IS MODERN-ONLY: TalkText was null/0-length for every pre-2011 record tested (1985, 1990, 1995, 1998, 2000, 2005, 2010) while metadata returned normally. Populated from 2011 onward. Search reaches 1901, so you get findable-but-unreadable results for a century of debates — a coverage cliff that will look like a parser bug if you don't expect it.",
+    "parlinfo.aph.gov.au IS WAF-BLOCKED: every ParlInfo URL (summary.w3p search, display.w3p, toc_unixml XML, toc_pdf PDF) returned HTTP 403 with an 'Azure WAF JS Challenge' body under curl AND WebFetch, with and without cookie jar and Referer. Since ParlInfo holds the pre-2011 XML/PDF, the historic fallback is UNVERIFIED and probably needs a headless browser that can solve the JS challenge. Do not allowlist parlinfo and assume it works from a Lambda.",
+    "/api/hansard/transcript IS UNDOCUMENTED: found by reading the site's own https://www.aph.gov.au/js/apps/hansard-display/HansardDisplay.js (line 243). It is not published, versioned, or supported, and APH owes you no deprecation notice. It is the only verified route to full text, so the whole pipeline rests on an internal endpoint that can vanish without warning. Add a canary test.",
+    "N+1 REQUEST SHAPE: search returns no speech text and no snippet, so every item needs its own transcript call. Ingesting a 798-page 1901-1910 result set (~19,950 items at ps=25) means ~20k extra HTTPS calls — plan Lambda timeouts, cost, and WAF-friendly pacing accordingly.",
+    "NO TOTAL-RESULTS COUNT anywhere in the HTML. You must regex the 'Last page' anchor (page=(\\d+)[^\"]*\" title=\"Last page\") to size a job, and multiply by ps to estimate. If that anchor is absent there is exactly one page.",
+    "SPEAKER FORMAT IS INCONSISTENT ACROSS ERAS/CHAMBERS: 'Chalmers, Jim MP', 'Wong, Sen Penny', 'Crean, Simon, MP' (stray comma), 'Mr ROCHER', 'SMITH, Sydney'. Speaker can also be null while the real person sits in Questioner/Responder/Presenter. Requires a real normalizer; naive 'Last, First' splitting will corrupt Senate names.",
+    "DATES ARE NOT ZERO-PADDED AND ARE DAY-FIRST: observed '22/06/2026' but also '8/10/2025' and '8/12/2005'. A fixed dd/mm/yyyy parser will throw; strict ISO parsing will mangle. Parse day-first with 1-2 digit tolerance.",
+    "PARTY IS ABSENT: no party field in either endpoint (I checked all 22 JSON keys). Only route is the MPID in TalkText -> scrape the Parliamentarian bio page, where party appears as unstructured prose tangled with branch/committee history. /api/parliamentarian/{id} and /{id}/details both 404. Build a static MPID->party table instead of resolving per speech.",
+    "NO SNIPPET/KWIC in search output — verified zero snippet markup in the result <li>. You must generate highlights yourself after fetching TalkText.",
+    "Status='Proof' means UNCORRECTED: recent sittings are provisional and the wording can still change before 'Final'. Store Status and re-fetch Proof records, or you will archive text that the official record later contradicts.",
+    "SPEAKER FILTER NEEDS A KEYWORD: pi=2&pv=Chalmers with no q returned 0 results, as did an unfiltered browse of Parliament 48. There is no 'all speeches by member X' or 'all speeches in date range' browse mode — every query needs a q, which biases any corpus you build toward your keyword list.",
+    "sourceUrl SHAPE CHANGES BY ERA: modern rows link to a relative /Parliamentary_Business/Hansard/Hansard_Display?bid=...&sid=... while pre-~2011 rows link to an absolute parlinfo display.w3p;query=Id%3A%22...%22. Handle both or you will emit broken/relative URLs for half the corpus.",
+    "DON'T SCRAPE Hansard_Display: it is a Knockout.js shell. The 245,910-byte page I fetched contained zero speech text ('Second Reading', 'I move', 'Fuel Excise' each 0 occurrences). It is a human permalink only.",
+    "docId's middle segment changes format across eras — numeric ('29164'), ISO date ('2010-11-25'), and GUID ('683c1920-c818-4261-b4de-1e254801ee9a' for roughly 2011-2021). Treat docId as an opaque string; never regex it as purely numeric.",
+    "COMMITTEE ROWS USE A DIFFERENT LABEL: the definition-list <dt> is 'COMMITTEES' (dd='Senate Committee Hansard') instead of 'CHAMBER'. Key off the dd value. Also set chi=1/chi=2 to keep committee hearings out of a floor-debate corpus — the default chi=0 mixes them in, and my first exploratory query came back almost entirely Senate committee hearings.",
+    "Federation Chamber (the House's second chamber) is reported with Chamber='House of Representatives' and only a 'Federation Chamber;' title prefix to distinguish it — verified in a real result row.",
+    "LICENCE IS CC BY-NC-ND 3.0 AU (Commonwealth of Australia), declared in DCTERMS.license. Non-Commercial and No-Derivatives are genuine legal constraints for a public or monetised product, and 'NoDerivs' sits awkwardly with snippeting, translation, or LLM-summarising the text. Get this reviewed before shipping.",
+    "A browser-like User-Agent is effectively mandatory: default curl and WebFetch drew 403s on aph.gov.au paths that succeeded with a Chrome UA. WebFetch could not reach these endpoints at all — all verification here was done via curl.",
+    "The obvious Australian 'open data' entry points are dead ends for debates, so don't burn time there: data.gov.au CKAN package_search?q=hansard returns 77 mostly-irrelevant datasets and the ONLY Hansard API hit is 'Hansard API | Parliament of NSW' (state, not federal); q=title:hansard returns exactly 1 record, also NSW. Federal Register of Legislation is statute text and out of scope. OpenAustralia.org.au has a documented getDebates/getHansard API (XML/PHP/JS/RABX output) but REQUIRES a key ('{\"error\":\"Invalid API key.\"}' confirmed live), is CC BY-NC-ND for parliamentary material, is explicitly free only for 'low volume, non-commercial use', and its data is widely believed stale — treat as unverified and not a primary source."
+  ],
+  "confidence": "high"
+}

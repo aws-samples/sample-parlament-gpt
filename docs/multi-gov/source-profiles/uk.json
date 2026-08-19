@@ -1,0 +1,157 @@
+{
+  "countryKey": "uk",
+  "displayName": "United Kingdom — UK Parliament (Hansard)",
+  "verdict": "ready",
+  "hasLiveQueryApi": true,
+  "sourceName": "Hansard API (UK Parliament), listed on developer.parliament.uk. Companion: Members API for party affiliation.",
+  "hosts": [
+    "hansard-api.parliament.uk",
+    "members-api.parliament.uk",
+    "hansard.parliament.uk"
+  ],
+  "protocol": "REST/JSON over HTTPS (HTTP/2, Cloudflare-fronted). Legacy ASP.NET Web API with Swagger 2.0 spec at https://hansard-api.parliament.uk/swagger/docs/v1 (verified 200, title \"Hansard API\", host \"hansard-api.parliament.uk\"). Response format chosen by path extension: `.json` or `.xml`. NOT OData — no $filter/$top/$skip; uses `queryParameters.*`-prefixed flat query params. `hansard.parliament.uk` is only needed for building human-facing sourceUrl links (do not scrape it — see gotchas).",
+  "auth": "none. No API key, no header, no token, no registration. Verified by anonymous curl from this sandbox: HTTP 200 with real result payloads. members-api.parliament.uk is likewise open (verified 200 anonymous). Data is published under the Open Parliament Licence (attribution required) — licence page itself is Cloudflare-blocked from this sandbox, so the exact licence text is UNVERIFIED, but the no-auth access is verified.",
+  "searchEndpoint": "GET /search/contributions/{contributionType}.{format} — use contributionType=`Spoken` for floor speeches. Path: `/search/contributions/Spoken.json`. Secondary: `/search/debates.json` (debate-title-level hits, no text), `/debates/debate/{debateSectionExtId}.json` (full ordered transcript of one debate), `/search/members.json` (member lookup incl. Party), `/search.json` (mixed-type quick search, hard-capped at ~4 results per type — do not use for harvesting).",
+  "exampleRequest": "https://hansard-api.parliament.uk/search/contributions/Spoken.json?queryParameters.searchTerm=spokenby%3ARichard%20Burgon%20AND%20words%3Aclimate&queryParameters.house=Commons&queryParameters.startDate=2024-01-01&queryParameters.endDate=2025-12-31&queryParameters.orderBy=SittingDateDesc&queryParameters.skip=0&queryParameters.take=20",
+  "verified": true,
+  "verificationNote": "Executed live with curl from this sandbox on 2026-08-03; all values below are observed, not inferred. (1) Swagger spec GET https://hansard-api.parliament.uk/swagger/docs/v1 -> 200, swagger 2.0, 33 paths. (2) GET /search/contributions/Spoken.json?queryParameters.searchTerm=climate%20change&queryParameters.house=Commons&queryParameters.startDate=2024-09-01&queryParameters.endDate=2024-12-31&queryParameters.take=2&queryParameters.skip=0 -> HTTP 200, TotalResultCount=334, SearchTerms=[\"climate\",\"change\"]. First result observed verbatim: MemberName=\"Richard Burgon\", MemberId=4493, AttributedTo=\"Richard Burgon\", ContributionExtId=\"6D749D0F-FD88-47D4-95D8-673FA723E5DC\", DebateSection=\"Flood Protection Funding\", DebateSectionExtId=\"8BAE692A-AD7B-4E81-99D8-2F4DD409C54F\", SittingDate=\"2024-12-19T00:00:00\", Section=\"Commons Chamber\", House=\"Commons\", VolumeNo via debate detail=759, ContributionTextFull = full verbatim speech (\"While the far right and shamefully even some MPs in this House are busy denying climate change...\"). (3) The exampleRequest URL above -> HTTP 200, TotalResultCount=7, first hit SittingDate 2025-04-29, DebateSection \"Climate Change: International Leadership\" — proves the `spokenby:X AND words:Y` directive syntax works. (4) GET /debates/debate/8BAE692A-....json -> 200 with keys Overview/Navigator/Items; Overview.VolumeNo=759, Overview.Location=\"Commons Chamber\"; Items[].AttributedTo contains inline party e.g. \"Richard Burgon (Leeds East) (Ind)\" and on a Lords debate \"Lord Pannick (CB)\", \"Lord Katz (Lab)\". (5) GET /search/members.json?queryParameters.searchTerm=Burgon -> 200, MemberId=4493, Party=\"Labour\", PartyId=15, MemberFrom=\"Leeds East\", House=\"Commons\". (6) GET https://members-api.parliament.uk/api/Members/4493 -> 200, latestParty.name=\"Labour\"; /api/Members/History?ids=4493 -> 200 with dated partyHistory[] entries (needed for correct historical party). (7) Pagination probed empirically: take=50 -> 50 rows, take=100 -> 100 rows, take=101/150/200 -> HTTP 500 {\"Message\":\"An error has occurred.\"}. So max take = 100. skip=20000 -> HTTP 200 with 5 rows (deep paging works, TotalResultCount=62623). (8) Coverage: /overview/firstyear.json -> \"1803\"; orderBy=SittingDateAsc gave 1804-03-14; SittingDateDesc gave 2026-07-23 (current). (9) Lords verified: house=Lords returned Section=\"Lords Chamber\", AttributedTo=\"Lord Roe of West Wickham (Lab)\". (10) 15 rapid sequential requests -> 15x HTTP 200, no 429. BLOCKED / UNVERIFIED: developer.parliament.uk, hansard.parliament.uk and www.parliament.uk all return HTTP 403 Cloudflare \"Just a moment...\" interstitials to both curl (incl. browser UA) and WebFetch from this sandbox — so I could not read the developer portal docs page, the published rate-limit policy, or confirm a rendered sourceUrl resolves to 200. The API host itself is not challenged.",
+  "queryParams": [
+    {
+      "purpose": "freetext",
+      "param": "queryParameters.searchTerm",
+      "note": "VERIFIED. Plain text is tokenized (searchTerm=\"climate change\" echoed back as SearchTerms:[\"climate\",\"change\"], i.e. OR-ish/ranked, NOT a phrase). Wrap in double quotes for phrase search: searchTerm=%22net%20zero%22 echoed SearchTerms:['\"net zero\"'] -> 10232 hits. Supports documented directives combinable with AND: spokenby:NAME, debate:TEXT, words:WORDS. Verified working: spokenby:Richard Burgon AND words:climate. searchTerm is OPTIONAL — omitting it and passing only a date range returned 497 contributions for Commons 2024-12-19, which is the right way to bulk-harvest a sitting day."
+    },
+    {
+      "purpose": "date_from",
+      "param": "queryParameters.startDate",
+      "note": "VERIFIED. Format yyyy-mm-dd (swagger types it date-time but the plain date string works). Inclusive. Can be used alone."
+    },
+    {
+      "purpose": "date_to",
+      "param": "queryParameters.endDate",
+      "note": "VERIFIED. Format yyyy-mm-dd, inclusive. Also queryParameters.date for a single exact sitting date."
+    },
+    {
+      "purpose": "speaker",
+      "param": "queryParameters.memberId",
+      "note": "VERIFIED (int32). memberId=4493 + searchTerm=flood -> 6 hits, all MemberName='Richard Burgon'. This is the reliable structured speaker filter. Get the id from /search/members.json?queryParameters.searchTerm=Surname. Also queryParameters.memberIds accepts a list (string) for multi-member filtering. The free-text alternative is the spokenby: directive inside searchTerm (verified), which matches on displayed name text and is fuzzier."
+    },
+    {
+      "purpose": "chamber",
+      "param": "queryParameters.house",
+      "note": "VERIFIED. Exactly 'Commons' or 'Lords'. Omitting it returns both. Note this filters House, not the finer-grained venue: the response `Section` field carries the venue and observed values across 100 rows were ['Commons Chamber','Lords Chamber','Westminster Hall']."
+    },
+    {
+      "purpose": "party",
+      "param": "n/a",
+      "note": "NOT SUPPORTED. There is no party query parameter anywhere in the Hansard API. To filter by party you must resolve members to party ids yourself (members-api) and pass queryParameters.memberIds, or post-filter. This is the single biggest gap."
+    },
+    {
+      "purpose": "term",
+      "param": "queryParameters.seriesNumber / queryParameters.volumeNumber",
+      "note": "PARTIALLY VERIFIED. There is no 'parliamentary term' or 'session' parameter. The closest analogues are Hansard series + bound volume number. volumeNumber=759 was accepted (HTTP 200) but appeared to be ignored for filtering (TotalResultCount identical to unfiltered 62623) — treat volumeNumber as UNRELIABLE for filtering. Use startDate/endDate to express a term instead."
+    },
+    {
+      "purpose": "page",
+      "param": "queryParameters.skip",
+      "note": "VERIFIED. Zero-based offset, default 0. skip=20000 still returned rows, so no shallow deep-paging ceiling was hit."
+    },
+    {
+      "purpose": "size",
+      "param": "queryParameters.take",
+      "note": "VERIFIED with a hard limit: take<=100 works; take=101 and above returns HTTP 500. Swagger says take can be omitted to return all results — do NOT rely on that for broad queries (unbounded payload). Always set take=100."
+    },
+    {
+      "purpose": "freetext",
+      "param": "queryParameters.orderBy",
+      "note": "VERIFIED. Enum SittingDateAsc | SittingDateDesc. Omitted => relevance order (response includes a Rank int). Deterministic date ordering is essential for stable pagination — always pass orderBy."
+    },
+    {
+      "purpose": "freetext",
+      "param": "queryParameters.debateSectionId",
+      "note": "int32, unique id of a debate section to search within. Also queryParameters.section (int32) and queryParameters.debateType (string). Present in swagger; NOT independently verified by me."
+    }
+  ],
+  "pagination": "Offset/limit via `queryParameters.skip` (0-based) and `queryParameters.take`. `take` is capped at 100 — 101+ returns HTTP 500 (verified). Total is returned as `TotalResultCount` on the envelope, so page count = ceil(TotalResultCount / take). No cursor, no next-link, no Link header. Loop: skip = 0, 100, 200, ... while skip < TotalResultCount. Always pass `queryParameters.orderBy=SittingDateDesc` (or Asc) — the default is relevance ranking (`Rank`) which is not guaranteed stable across pages. Deep offsets are fine (skip=20000 returned HTTP 200 with rows against a 62,623-row result set). Note the envelope's `SpokenResultCount`/`WrittenResultCount`/`CorrectionsResultCount`/`DivisionsResultCount` fields were all observed as 0 on the /search/contributions/Spoken.json endpoint — do not paginate off them, they are only populated by /search.json.",
+  "fieldMapping": [
+    {
+      "normalized": "title",
+      "sourcePath": "Results[].DebateSection",
+      "note": "VERIFIED. The debate/section title the contribution sits in, e.g. \"Flood Protection Funding\", \"Climate Change: International Leadership\". Note: /search/debates.json returns the analogous value in `Title` (sometimes with a leading space, e.g. \" State of Climate and Nature\") — trim it. For a hierarchical title, /debates/debate/{id}.json returns Navigator[] as a breadcrumb (e.g. Commons Chamber > Oral Answers to Questions > Environment, Food and Rural Affairs > Flood Protection Funding)."
+    },
+    {
+      "normalized": "speaker",
+      "sourcePath": "Results[].MemberName (primary); fall back to Results[].AttributedTo",
+      "note": "VERIFIED. MemberName is the clean personal name (\"Richard Burgon\", \"Sir Keir Starmer\"). AttributedTo is the as-printed attribution and often carries office/role, e.g. \"The Minister for Food Security and Rural Affairs (Daniel Zeichner)\" or \"The Prime Minister (Keir Starmer)\". IMPORTANT: on historic material both are null — a verified 1850 hit had MemberName=null, MemberId=null, AttributedTo=null. Make speaker nullable and fall back to AttributedTo, then to null."
+    },
+    {
+      "normalized": "party",
+      "sourcePath": "NOT in the contributions search response — requires a second call",
+      "note": "VERIFIED GAP. /search/contributions/Spoken.json returns NO party field. Three options: (a) BEST — join on Results[].MemberId to https://members-api.parliament.uk/api/Members/History?ids={id} and pick the partyHistory[] entry whose startDate<=SittingDate<=endDate (verified: dated entries with party.name / party.abbreviation / party.backgroundColour); this is the only correct approach for historical speeches since members change party. (b) CHEAPER — /search/members.json?queryParameters.searchTerm=Surname gives `Party` (\"Labour\") + `PartyId` (15) but only the LATEST affiliation. (c) SCRAPE-FREE FALLBACK — /debates/debate/{debateSectionExtId}.json Items[].AttributedTo embeds the party abbreviation in trailing parens: \"Richard Burgon (Leeds East) (Ind)\", \"Lord Pannick (CB)\", \"Lord Katz (Lab)\". Regex /\\(([^)]+)\\)\\s*$/ on that. Caveat observed: this member's live latestParty is \"Labour\" but the 2024-12-19 debate text says \"(Ind)\" — the debate-level string is the historically accurate one. Cache a memberId->party map; do not call members-api per row."
+    },
+    {
+      "normalized": "date",
+      "sourcePath": "Results[].SittingDate",
+      "note": "VERIFIED. ISO-8601 with a zero time component and no timezone, e.g. \"2024-12-19T00:00:00\". Slice to the first 10 chars for a date. Results[].Timecode is a nullable wall-clock timestamp of the actual utterance (\"2024-12-19T09:30:00\") — often null (null on 1 of 2 rows in my first call); use it only as an optional enrichment."
+    },
+    {
+      "normalized": "chamber",
+      "sourcePath": "Results[].House plus Results[].Section",
+      "note": "VERIFIED. House is \"Commons\" | \"Lords\". Section is the venue: observed \"Commons Chamber\", \"Lords Chamber\", \"Westminster Hall\". Recommend chamber = Section when present (more informative) else House. In /debates/debate/{id}.json the same venue appears as Overview.Location."
+    },
+    {
+      "normalized": "term",
+      "sourcePath": "NOT AVAILABLE — derive it",
+      "note": "VERIFIED GAP. No parliament/term/session field is returned by any Hansard endpoint I called. Derive term client-side from SittingDate against a static table of UK parliaments (e.g. 2024-07-04 onwards = 59th Parliament). The nearest API-native proxy is the bound-volume number, available only on the debate-detail call as Overview.VolumeNo (observed 759 for Commons 2024-12-19, 858 for Lords 2026-07-23) — that is a volume, not a term, so do not label it 'term'."
+    },
+    {
+      "normalized": "sessionRef",
+      "sourcePath": "Overview.VolumeNo from /debates/debate/{debateSectionExtId}.json, combined with Results[].HansardSection",
+      "note": "PARTIALLY VERIFIED. Best available citation-ish reference. VolumeNo requires the extra debate-detail call. Results[].HansardSection is a column-range code on the search rows (observed \"AA-AD\", \"AE-AH\"). Actual column numbers are embedded as HTML inside ContributionTextFull: <span id=\"430\" class=\"column-number\" data-column-number=\"430\"></span>. Suggested sessionRef string: `HC Deb vol 759 c430` assembled from those parts. If you don't want the extra request, store sessionRef = DebateSectionExtId and treat volume as optional."
+    },
+    {
+      "normalized": "snippet",
+      "sourcePath": "Results[].ContributionText",
+      "note": "VERIFIED. Pre-truncated ~250-char plain-text excerpt, leading space, no HTML. Note on historic rows the API injects <em> highlight tags into ContributionTextFull (1850 hit: \"the <em>Aberdeen</em> Railway Company\") — strip tags before display."
+    },
+    {
+      "normalized": "sourceUrl",
+      "sourcePath": "Construct: https://hansard.parliament.uk/{House}/{SittingDate:yyyy-MM-dd}/debates/{DebateSectionExtId}/{TitleSlug}#contribution-{ContributionExtId}",
+      "note": "UNVERIFIED — construction only. Concretely: https://hansard.parliament.uk/Commons/2024-12-19/debates/8BAE692A-AD7B-4E81-99D8-2F4DD409C54F/FloodProtectionFunding#contribution-6D749D0F-FD88-47D4-95D8-673FA723E5DC (TitleSlug = DebateSection with non-alphanumerics removed). I could NOT confirm this resolves: hansard.parliament.uk returned HTTP 403 Cloudflare challenge to every attempt (plain curl, browser UA, full browser header set, and WebFetch). The slug segment appeared to be cosmetic in past behaviour but I cannot verify that here. Validate one URL manually in a real browser before shipping."
+    },
+    {
+      "normalized": "docId",
+      "sourcePath": "Results[].ContributionExtId (per-speech); Results[].DebateSectionExtId (per-debate)",
+      "note": "VERIFIED. Both are uppercase GUIDs, e.g. ContributionExtId=\"6D749D0F-FD88-47D4-95D8-673FA723E5DC\", DebateSectionExtId=\"8BAE692A-AD7B-4E81-99D8-2F4DD409C54F\". Use ContributionExtId as the primary key for a speech-level document. CASE WARNING: modern rows are uppercase but the 1850 row returned a lowercase GUID (\"564f7b93-e923-4248-98e4-5f23eaa39200\") — normalize case before dedupe. Also available: integer Results[].ItemId (41678280) and Results[].DebateSectionId (4797096), plus OrderInDebateSection / DebateSectionOrder for reassembling reading order."
+    },
+    {
+      "normalized": "language",
+      "sourcePath": "NOT PRESENT — hardcode \"en\"",
+      "note": "VERIFIED GAP. No language field exists. Hansard is English. Occasional Welsh/Gaelic passages appear inline in the text but are not tagged, so per-row language detection is not possible from the API."
+    }
+  ],
+  "fullTextAccess": "Excellent — the FULL verbatim text is embedded directly in the search response, no second request needed. `Results[].ContributionTextFull` carries the complete speech as HTML-ish text (verified: a full multi-sentence Richard Burgon question, and a multi-paragraph Keir Starmer statement). `Results[].ContributionText` is the ~250-char plain-text snippet. Cleaning required on ContributionTextFull: strip `<span class=\"column-number\" data-column-number=\"NNN\">` markers (harvest them first if you want column citations), strip `<em>` search-highlight tags (present on historic rows), and normalize `\\r\\n\\r\\n` paragraph breaks and U+2019 curly apostrophes. For the complete ordered transcript of a whole debate, call GET /debates/debate/{debateSectionExtId}.json — returns Items[] with ItemType (\"Contribution\" | \"Timestamp\"), MemberId, AttributedTo (party embedded), OrderInSection, ExternalId, and `Value` containing richer Hansard XML markup (verified: `<Question HRSContentId=\"{...}\"><QuestionText ...>What reforms he has made to funding for flood protection.</QuestionText></Question>`) — that markup is heavier to parse than the search endpoint's ContributionTextFull, so prefer the search endpoint for indexing and the debate endpoint only for context/party/ordering. Official PDFs of the bound record are also available via /overview/pdfsforday.{format} and /pdfs/pdf.{format} (not needed for text extraction).",
+  "languages": "English only (en). No language field in the API — hardcode \"en\". Occasional untagged Welsh or Gaelic passages appear inline in Commons/Westminster Hall text.",
+  "rateLimits": "No documented limit that I could read, and none observed. 15 rapid sequential requests all returned HTTP 200 with no 429 and no Retry-After. Response headers show `cache-control: no-cache`, `cf-cache-status: DYNAMIC`, `server: cloudflare` — no X-RateLimit-* headers. The published policy on developer.parliament.uk is UNVERIFIED (that host is Cloudflare-403 from this sandbox). Because the whole estate sits behind Cloudflare, treat aggressive parallelism as challenge-triggering risk: recommend <= 3-5 concurrent requests, a descriptive User-Agent with a contact address, retry-with-backoff on 429/403/5xx, and caching by ContributionExtId. Contact for questions per the swagger spec: softwareengineering@parliament.uk.",
+  "gotchas": [
+    "`take` is hard-capped at 100. take=101 or higher returns HTTP 500 {\"Message\":\"An error has occurred.\"} — a 500, not a 400, so a naive client may misread it as a transient outage and retry forever. Verified at 101/150/200.",
+    "There is NO party field on the contributions search response and NO party query parameter anywhere in the Hansard API. Party must come from a second source. Budget for it in the Lambda.",
+    "Party is time-varying and the easy answer is wrong. members-api `latestParty` for MemberId 4493 is \"Labour\", but the 2024-12-19 debate record attributes him as \"(Ind)\". For historically correct party you must use https://members-api.parliament.uk/api/Members/History?ids={id} and select the partyHistory[] entry covering SittingDate.",
+    "Plain `searchTerm` is tokenized, not phrase-matched: searchTerm=\"climate change\" comes back as SearchTerms:[\"climate\",\"change\"]. You must URL-encode surrounding double quotes (%22net%20zero%22) to get phrase semantics.",
+    "Default result order is relevance (`Rank`), NOT date — so paginating without orderBy risks duplicate/missing rows across pages. Always send queryParameters.orderBy=SittingDateDesc or SittingDateAsc.",
+    "The parameter prefix `queryParameters.` is mandatory and easy to drop. Omitting it silently yields unfiltered results rather than an error — e.g. a plain `searchTerm=` is ignored, which looks like the API returning everything.",
+    "Wrong/unknown paths return HTTP 404 with a JSON body {\"Message\":\"No HTTP resource was found...\"} rather than a hard failure. Three swagger-listed paths did NOT work as spec'd when I called them: /overview/lastsittingdate.json (404), /search/parlisearchredirect.json (404), /search/membercontributionsummary/{id}.json (404), /search/debatebyexternalid.json (404). Do not trust the swagger path list without probing.",
+    "`queryParameters.outputType=Group` returned only {\"Message\": ...} (an error envelope, no Results) on /search/contributions/Spoken.json. Use the default List output only.",
+    "Historic material (pre-~1900) has null MemberName / MemberId / AttributedTo, lowercase GUIDs, empty HRSTag, and injects <em> highlight tags into ContributionTextFull. Coverage goes back to 1803 (/overview/firstyear.json = \"1803\"), so if you ingest the full archive your schema must tolerate null speakers.",
+    "GUID case is inconsistent across eras (uppercase modern, lowercase historic). Normalize before using ContributionExtId as a dedupe key.",
+    "contributionType is a path segment, not a query param. `Spoken` is what you want; `Written`, `Corrections`, `Petitions` share the identical response shape, so a config typo silently ingests written answers instead of floor speeches and nothing in the payload flags the difference.",
+    "ContributionTextFull contains embedded HTML that will pollute an index if unstripped: <span class=\"column-number\" data-column-number=\"430\"></span> markers mid-sentence, plus \\r\\n\\r\\n breaks and U+2019 curly apostrophes.",
+    "`queryParameters.house` only distinguishes Commons/Lords. Westminster Hall debates come back under house=Commons and are only distinguishable via the response `Section` field (observed values: Commons Chamber, Lords Chamber, Westminster Hall).",
+    "queryParameters.volumeNumber was accepted (HTTP 200) but did not appear to filter — TotalResultCount was unchanged at 62623. Treat it as non-functional; use date ranges instead.",
+    "The envelope counters SpokenResultCount / WrittenResultCount / CorrectionsResultCount / DivisionsResultCount were all 0 on this endpoint even with 334 real results. Paginate off TotalResultCount only.",
+    "EGRESS/ALLOWLIST TRAP: hansard-api.parliament.uk answers anonymous requests fine, but hansard.parliament.uk, developer.parliament.uk and www.parliament.uk all served HTTP 403 Cloudflare \"Just a moment...\" interstitials to curl (incl. browser UA) and to WebFetch from this sandbox. Consequence: the constructed sourceUrl is UNVERIFIED and any Lambda that tries to fetch or health-check hansard.parliament.uk will likely get 403. Store the URL for humans; never fetch it server-side.",
+    "Data is Open Parliament Licence (attribution required). The licence page was 403 from here so the exact terms are UNVERIFIED — confirm attribution wording before public launch.",
+    "Ignore legislation.gov.uk entirely for this use case: it is statute text, not debates, and is out of scope."
+  ],
+  "confidence": "high"
+}

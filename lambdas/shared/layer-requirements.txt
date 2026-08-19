@@ -1,0 +1,7 @@
+# Third-party runtime dependencies bundled INTO the shared Lambda layer alongside the
+# gov_debates package. boto3/botocore are already present in the Lambda Python runtime, so only
+# httpx (and its deps) plus the hardened XML parser need bundling here.
+# Exact pins: the layer must carry the versions the tests ran against (threat model T7).
+httpx==0.28.1
+# XXE-hardened drop-in for xml.etree parsing of untrusted upstream XML (CA/FR/NL adapters).
+defusedxml==0.7.1

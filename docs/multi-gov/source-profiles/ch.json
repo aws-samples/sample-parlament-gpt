@@ -1,0 +1,180 @@
+{
+  "countryKey": "ch",
+  "displayName": "Switzerland — Federal Assembly (Bundesversammlung / Assemblée fédérale)",
+  "verdict": "workable",
+  "hasLiveQueryApi": true,
+  "sourceName": "Parlamentsdienste OData Webservice (ws.parlament.ch/OData.svc) — Transcript entity set = Amtliches Bulletin / Bulletin officiel verbatim report",
+  "hosts": [
+    "ws.parlament.ch",
+    "www.parlament.ch"
+  ],
+  "protocol": "OData v2 (DataServiceVersion: 1.0; ASP.NET WCF Data Services / Entity Framework backend). HTTPS + HTTP/2, served behind Akamai. JSON only via ?$format=json or Accept: application/json — the default response is application/atom+xml. JSON is \"odata=verbose\" flavour: results are wrapped in {\"d\":{\"results\":[...],\"__count\":\"N\",\"__next\":\"...\"}} for collections and {\"d\":{...}} for a single entity. NOTE: with $format=json and no $inlinecount, some responses come back as {\"d\":[...]} (a bare array, not an object with .results) — client MUST handle both shapes. Edm.DateTime serializes as \"/Date(1734536444504)/\" (epoch ms), and Edm.Int64 serializes as a STRING (\"377739\"). OData v4 syntax is NOT supported (contains() returns HTTP 400 — use substringof()).",
+  "auth": "none — fully open, no API key, no token, no registration, no Referer/User-Agent requirement. Verified anonymous curl from a sandbox returns HTTP 200. Response sets an ASP.NET_SessionId cookie but it is not required for subsequent calls. Terms of use (official, from parlament.ch Open Data page): must not present data as an official publication; must cite the source «Parlamentsdienste der Bundesversammlung, Bern»; must not alter content; must show the download date. No key to request.",
+  "searchEndpoint": "GET /odata.svc/Transcript  (host ws.parlament.ch; the service canonicalizes itself to /OData.svc/ in __metadata URIs but the lowercase /odata.svc/ path works and is what the official docs publish). Companion sets: /odata.svc/Subject (debate agenda item), /odata.svc/SubjectBusiness (debate TITLE — Transcript has no title field), /odata.svc/Meeting, /odata.svc/Session (session name + legislative period), /odata.svc/MemberCouncil (party), /odata.svc/$metadata (full EDMX, 130 KB).",
+  "exampleRequest": "https://ws.parlament.ch/odata.svc/Transcript?$filter=Language%20eq%20'DE'%20and%20Type%20eq%201%20and%20substringof('Klimawandel',Text)%20and%20MeetingDate%20ge%20'20240101'%20and%20MeetingDate%20le%20'20241231'&$select=ID,Language,LanguageOfText,Text,SpeakerFullName,SpeakerFunction,ParlGroupAbbreviation,CantonAbbreviation,CouncilName,MeetingCouncilAbbreviation,MeetingDate,IdSession,IdSubject,PersonNumber&$orderby=MeetingDate%20desc&$top=20&$inlinecount=allpages&$format=json",
+  "verified": true,
+  "verificationNote": "ACTUALLY CALLED, anonymously, many times. (1) GET /odata.svc/$metadata → HTTP 200, 130112 bytes; confirmed EntityType \"Transcript\" with composite key (ID, Language) and the exact property list used in the mapping below. (2) GET /odata.svc/ service doc → HTTP 200, Transcript listed among ~50 collections. (3) Transcript/$count?$filter=Language eq 'DE' → 346433. Identical count for FR, IT, RM, EN (all 346433) — proving Language is a label-localization axis, not a content axis. (4) The exampleRequest above → HTTP 200 in 1.99 s, __count=101, real rows: ID=\"350903\", SpeakerFullName=\"Hübscher Martin\", SpeakerFunction=\"Mit-M\", ParlGroupAbbreviation=\"V\", ParlGroupName=\"Fraktion der Schweizerischen Volkspartei\", CantonAbbreviation=\"ZH\", CouncilName=\"Nationalrat\", MeetingCouncilAbbreviation=\"N\", MeetingDate=\"20241218\", IdSession=\"5206\", IdSubject=\"66699\", PersonNumber=10831, Start=\"/Date(1734536444504)/\", LanguageOfText=\"DE\", Text=\"<pd_text><p>Nach Artikel 6 des Landwirtschaftsgesetzes (LwG) werden die finanziellen Mittel für die wichtigsten Aufgabenbereiche der Agrarpolitik…\". Second row ID=\"351046\", SpeakerFullName=\"Ritter Markus\", ParlGroupAbbreviation=\"M-E\". (5) Speaker filter SpeakerLastName eq 'Rösti' → 1886 hits, first ID=122366 MeetingDate=\"20111212\"; substringof('Rösti',SpeakerFullName) → same 1886; PersonNumber eq 4246 → 90. (6) Date coverage: $orderby=MeetingDate asc → earliest \"19991206\"; desc → latest \"20260619\". (7) Chamber: MeetingCouncilAbbreviation 'N'=236798, 'S'=108382. (8) Type: 1=277308 (speech), 2=33278 (vote block), 3=35847 (heading/procedural), 0/4/5=0. (9) LanguageOfText within Language='DE': DE=207704, FR=57625, IT=2498. (10) Pagination: $top=1200 returned exactly 1000 rows plus __next=\"…&$top=200&$skiptoken=1005L,'DE'\"; followed that nextLink → 200 rows, IDs 1006..1207. With $orderby=MeetingDate desc the skiptoken became \"'20260617',377797L,'DE'\" (orderby keys prepended). $skip=5&$orderby=ID also works (returned IDs 11,12). (11) substringof is case-INSENSITIVE: 'Klimawandel'/'klimawandel'/'KLIMAWANDEL' all → 92. (12) OData v4 contains(Text,'Klima') → HTTP 400. (13) $expand=Subjects → HTTP 200 (Subject ID=72019, IdMeeting=5249, VerbalixOid=806022); $expand=MembersCouncil → HTTP 200 (MemberCouncil ID=4246); $expand=Businesses → HTTP 500 EntityCommandExecutionException (server-side bug — do NOT use). (14) Title join: SubjectBusiness?$filter=IdSubject eq 66699L → BusinessShortNumber=\"24.061\", Title=\"Finanzielle Mittel für die Landwirtschaft in den Jahren 2026–2029. Bundesbeschluss\", TitleDE/TitleFR present, TitleIT=null. (15) Session ID=5206 → SessionName=\"Wintersession 2024\", Abbreviation=\"WS 24\", LegislativePeriodNumber=52. (16) Text identity across languages: Transcript(ID=377739L) fetched as DE, FR, IT — md5(Text) identical 083bf267f2d3 in all three, LanguageOfText=\"DE\" in all three, while CouncilName localized to Nationalrat / Conseil national / Consiglio nazionale. Language='EN' returns FRENCH labels (\"Conseil national\"), i.e. EN is not really translated. (17) sourceUrl verified: https://www.parlament.ch/de/ratsbetrieb/amtliches-bulletin/amtliches-bulletin-die-verhandlungen?SubjectId=66699 → HTTP 200, 214 KB, <title>Amtliches Bulletin</title> (Angular shell — speech text is NOT in the served HTML, it is loaded client-side; fine as a human-facing citation link, useless for scraping). (18) LATENCY — the real risk: cold-cache unbounded free-text $count?$filter=substringof('Velostreifen',Text) took 44.7 s; substringof('Kernfusionskraftwerk',Text) took 43.1 s; one cold substringof('Klimawandel',Text) with $orderby took 84.0 s. The identical request repeated immediately took 0.157 s (cached). Adding a MeetingDate range cut a cold query to 4.7 s. (19) 8 rapid sequential requests → all HTTP 200, no 429. (20) oda.parlament.ch does NOT resolve (NXDOMAIN) — that hostname from the task brief is wrong/dead; do not allowlist it. ws-old.parlament.ch root → 200 but /odata.svc → 404, so ws-old is not a usable mirror despite the docs page still naming it.",
+  "queryParams": [
+    {
+      "purpose": "freetext",
+      "param": "$filter=substringof('<term>',Text)",
+      "note": "The only free-text mechanism. Case-INSENSITIVE (verified: Klimawandel/klimawandel/KLIMAWANDEL all → 92 hits) because the underlying SQL collation is CI. Substring match only — no stemming, no tokenization, no relevance ranking, no phrase/boolean operators. It is a full-table LIKE '%…%' scan over a MAX-length nvarchar column across 346k rows: budget 40-85 s cold. ALWAYS AND it with a MeetingDate range to keep it under ~5 s. Multiple terms = chained 'and substringof(...)' (AND semantics) or 'or' for OR. Escape a literal apostrophe by doubling it ('' ) and URL-encode the whole $filter value."
+    },
+    {
+      "purpose": "freetext",
+      "param": "$filter=substringof('<term>',SpeakerFullName)",
+      "note": "Alternative free-text target for name search; also works on VoteBusinessTitle."
+    },
+    {
+      "purpose": "date_from",
+      "param": "$filter=MeetingDate ge '20240101'",
+      "note": "PREFERRED date filter. MeetingDate is Edm.String, MaxLength 8, format YYYYMMDD — so it is a STRING comparison with quotes, not datetime literal syntax. Lexicographic ordering equals chronological ordering for this format, so ge/le/gt/lt all behave correctly. Verified: ge '20250301' and le '20250320' → 3145 rows. This is the cheap, index-friendly predicate — put it first in your $filter."
+    },
+    {
+      "purpose": "date_to",
+      "param": "$filter=MeetingDate le '20241231'",
+      "note": "Inclusive upper bound, same YYYYMMDD string form."
+    },
+    {
+      "purpose": "date_from",
+      "param": "$filter=Start gt datetime'2023-01-01T00:00:00'",
+      "note": "Alternative precise timestamp filter on Edm.DateTime Start (speech start time). Requires OData v2 datetime'…' literal syntax (NOT bare ISO, NOT v4 style). Verified working. Start/End are nullable, so rows with null Start silently drop out of the result — that is why MeetingDate is preferred for date-range windows. StartTimeWithTimezone / EndTimeWithTimezone are Edm.DateTimeOffset equivalents."
+    },
+    {
+      "purpose": "speaker",
+      "param": "$filter=SpeakerLastName eq 'Rösti'",
+      "note": "Exact match on the denormalized surname. Verified 1886 hits. Also SpeakerFirstName, and SpeakerFullName which is formatted 'Lastname Firstname' (e.g. 'Rösti Albert', 'Hübscher Martin') — note the surname-first order when doing eq matches. Non-ASCII must be UTF-8 percent-encoded."
+    },
+    {
+      "purpose": "speaker",
+      "param": "$filter=PersonNumber eq 4246",
+      "note": "Stable numeric person ID — the robust way to pin a speaker across name changes/spellings. Joins to MemberCouncil.ID and MemberCouncil.PersonNumber (verified equal: 4246 = Christine Badertscher, GRÜNE, NR)."
+    },
+    {
+      "purpose": "chamber",
+      "param": "$filter=MeetingCouncilAbbreviation eq 'N'",
+      "note": "'N' = Nationalrat / Conseil national (lower house, 236798 rows), 'S' = Ständerat / Conseil des États (upper house, 108382). MaxLength 1. Note the sibling fields CouncilId/CouncilName describe the SPEAKER's own council (and are 'Bundesrat' for Federal Councillors, or null on non-speech rows) — they are NOT the venue. Use MeetingCouncilAbbreviation for the chamber where the debate happened."
+    },
+    {
+      "purpose": "term",
+      "param": "(no direct param — join via IdSession)",
+      "note": "Transcript carries no legislative-period field. Filter Session?$filter=LegislativePeriodNumber eq 52 to get session IDs, then Transcript?$filter=IdSession eq '5206'. IdSession on Transcript is Edm.String MaxLength 4 (quote it: IdSession eq '5206'), whereas Session.ID is Edm.Int32 (do not quote). Meeting also exposes LegislativePeriodNumber."
+    },
+    {
+      "purpose": "size",
+      "param": "$top",
+      "note": "Max effective value is 1000 (server page cap). $top=1200 silently returned 1000 rows + a __next link. Use $top=20..50 for interactive search."
+    },
+    {
+      "purpose": "page",
+      "param": "$skiptoken",
+      "note": "Server-driven paging token, supplied in __next. Opaque-ish value is actually the key tuple, e.g. 1005L,'DE' or with $orderby: '20260617',377797L,'DE'. Do not construct it — echo the __next URL."
+    },
+    {
+      "purpose": "page",
+      "param": "$skip",
+      "note": "Client-driven paging also supported (verified $skip=5&$orderby=ID → IDs 11,12). Reliable only with a deterministic $orderby, and gets slow at deep offsets."
+    },
+    {
+      "purpose": "freetext",
+      "param": "$select / $orderby / $inlinecount / $format / $expand",
+      "note": "$select MUST be used to exclude Text on list views (Text is MAX-length; a 20-row page with Text is heavy — single speeches run 6800+ chars). $orderby=MeetingDate desc, SortOrder gives correct chronological+in-sitting reading order. $inlinecount=allpages puts the total in d.__count. $format=json required for JSON (or Accept header). $expand=Subjects and $expand=MembersCouncil work; $expand=Businesses returns HTTP 500."
+    }
+  ],
+  "pagination": "Two mechanisms, both verified. (A) SERVER-DRIVEN (recommended): the service caps any page at 1000 rows and, when more exist, emits d.__next — an absolute URL containing $skiptoken. Verified: $top=1200 → 1000 rows + __next=\"https://ws.parlament.ch/odata.svc/Transcript?$filter=Language%20eq%20'DE'&$select=ID&$top=200&$skiptoken=1005L,'DE'\"; following it returned exactly 200 rows (IDs 1006-1207) and no further __next (because the original $top budget was exhausted — the remaining-count is carried in the rewritten $top). The skiptoken is the last row's key tuple, prefixed by the $orderby key values when $orderby is present (observed \"'20260617',377797L,'DE'\"). Loop: follow d.__next verbatim until absent; do not synthesize skiptokens. Note the shape hazard — read __next from the object form; when the response degrades to {\"d\":[...]} there is no place for __next, so always request $inlinecount=allpages to force the object form. (B) CLIENT-DRIVEN: $top + $skip with a stable $orderby (e.g. $orderby=ID). Fine for shallow paging; degrades at large offsets. Total row count: $inlinecount=allpages → d.__count (string), or the dedicated raw endpoint /odata.svc/Transcript/$count?$filter=… which returns a bare integer in text/plain (fast, and the cheapest way to size a result set).",
+  "fieldMapping": [
+    {
+      "normalized": "docId",
+      "sourcePath": "d.results[].ID  (+ Language)",
+      "note": "Edm.Int64 but serialized as a STRING, e.g. \"350903\". NOT unique on its own — the entity key is the composite (ID, Language), and the same speech exists as 5 rows (DE/FR/IT/RM/EN). Recommend docId = \"ch-transcript-\" + ID (drop Language, since Text is identical across all 5 — see the language note). Entity URL form: Transcript(ID=350903L,Language='DE') — note the mandatory L suffix on the Int64 key."
+    },
+    {
+      "normalized": "speaker",
+      "sourcePath": "d.results[].SpeakerFullName",
+      "note": "Formatted \"Lastname Firstname\" — observed \"Hübscher Martin\", \"Ritter Markus\", \"Rösti Albert\". Split via SpeakerLastName + SpeakerFirstName if you need components. CRITICAL: this is an EMPTY STRING \"\" (not null) on non-speech rows (Type 2 vote blocks, Type 3 headings) — verified ID=351692 has SpeakerFullName=\"\", SpeakerFunction=null. Filter Type eq 1 to get only attributable spoken contributions. SpeakerFunction gives the speaking role as a code: \"Mit-M\"/\"Mit-F\" = Mitglied male/female, \"BR-M\" = Bundesrat (Federal Councillor, i.e. government minister, not an MP) — observed on Rösti Albert with CouncilName=\"Bundesrat\". DisplaySpeaker (Boolean, often null) is the publisher's hint on whether to show the name. PersonNumber (Edm.Int32) is the stable speaker ID for joins."
+    },
+    {
+      "normalized": "party",
+      "sourcePath": "d.results[].ParlGroupAbbreviation  /  ParlGroupName",
+      "note": "PARLIAMENTARY GROUP (Fraktion), not the party proper. Observed \"V\" = \"Fraktion der Schweizerischen Volkspartei\" (SVP), \"M-E\" = \"Die Mitte-Fraktion. Die Mitte. EVP.\", \"G\" = \"Grüne Fraktion\". These are LOCALIZED by the row's Language (FR row → \"Groupe des VERT-E-S\", IT → \"Gruppo dei Verdi\"), so pin Language='DE' for stable values. NULL for Federal Councillors (verified null on the BR-M Rösti row). For the actual PARTY, join MemberCouncil on PersonNumber → PartyAbbreviation (\"GRÜNE\") / PartyName (\"GRÜNE Schweiz\"); Transcript itself has no party field. CantonAbbreviation (\"ZH\", \"SG\", \"BE\") / CantonName give the electoral canton."
+    },
+    {
+      "normalized": "date",
+      "sourcePath": "d.results[].MeetingDate  (precise: Start / StartTimeWithTimezone)",
+      "note": "MeetingDate is a YYYYMMDD STRING, e.g. \"20241218\" → normalize to 2024-12-18. Always populated; this is your primary date. Start is Edm.DateTime serialized OData-v2 style as \"/Date(1734536444504)/\" — parse the epoch-milliseconds out of the /Date(...)/ wrapper (regex /\\/Date\\((-?\\d+)\\)\\//); it is nullable and carries no zone. StartTimeWithTimezone / EndTimeWithTimezone are Edm.DateTimeOffset variants with the offset. End = speech end time. Modified = last-changed timestamp, usable for incremental sync ($filter=Modified gt datetime'…')."
+    },
+    {
+      "normalized": "chamber",
+      "sourcePath": "d.results[].MeetingCouncilAbbreviation",
+      "note": "\"N\" → Nationalrat / National Council (lower house); \"S\" → Ständerat / Council of States (upper house). Map these two codes yourself. Do NOT use CouncilName/CouncilId for chamber — those describe the speaker's affiliation and read \"Bundesrat\" for government ministers and null on non-speech rows (verified)."
+    },
+    {
+      "normalized": "date",
+      "sourcePath": "d.results[].MeetingVerbalixOid / IdSubject",
+      "note": "Secondary keys into the publishing system; MeetingVerbalixOid (Int32) matches Subject.VerbalixOid (observed 806022) and is the Amtliches-Bulletin document OID."
+    },
+    {
+      "normalized": "sessionRef",
+      "sourcePath": "d.results[].IdSession → Session(ID).SessionName / Abbreviation",
+      "note": "IdSession on Transcript is a STRING (\"5206\", \"5214\", MaxLength 4). Join /odata.svc/Session?$filter=Language eq 'DE' and ID eq 5206 (ID is Int32 there — unquoted) → SessionName=\"Wintersession 2024\", Abbreviation=\"WS 24\", StartDate/EndDate. Cache the whole Session table (small, ~1 row per session per language) instead of joining per result. Suggested sessionRef = Abbreviation (\"WS 24\") or SessionName."
+    },
+    {
+      "normalized": "term",
+      "sourcePath": "Session(IdSession).LegislativePeriodNumber",
+      "note": "NOT on Transcript — must come from the Session (or Meeting) join. Verified: IdSession 5206 and 5214 both → LegislativePeriodNumber=52 (the 2023-2027 legislature). Cache Session→period. /odata.svc/LegislativePeriod gives the period's date bounds."
+    },
+    {
+      "normalized": "title",
+      "sourcePath": "SubjectBusiness (join on IdSubject).Title  |  fallback d.results[].VoteBusinessTitle",
+      "note": "NO title field exists on Transcript. Best source: /odata.svc/SubjectBusiness?$filter=Language eq 'DE' and IdSubject eq 66699L → Title=\"Finanzielle Mittel für die Landwirtschaft in den Jahren 2026–2029. Bundesbeschluss\", BusinessShortNumber=\"24.061\", BusinessNumber=20240061, PublishedNotes=\"Erstrat - Premier Conseil\", plus pre-localized TitleDE/TitleFR/TitleIT (TitleIT was null on the sample — fall back). Note IdSubject needs the L suffix in $filter. One Subject can map to several SubjectBusiness rows (use SortOrder=1). VoteBusinessTitle (MaxLength 2000) is on Transcript directly but was NULL on every speech row observed — it is only populated on vote-linked rows, so it is a weak fallback. Do NOT rely on $expand=Businesses to shortcut this: it returns HTTP 500."
+    },
+    {
+      "normalized": "snippet",
+      "sourcePath": "d.results[].Text",
+      "note": "THE ACTUAL VERBATIM SPEECH. Edm.String MaxLength=Max; a single speech ran 6800 chars. Wrapped in a custom pseudo-XML envelope <pd_text> containing <p> paragraphs, with inline <i>/<b>; strip tags to get plain text (observed tag set: pd_text, p, i, b). Also contains typesetting control tokens that MUST be scrubbed: [GZ] (line/section break), [NB] (non-breaking space), [NAM] (roll-call marker), [VS], [PAGE 13…] (page break). Build the snippet by stripping markup, removing those bracket codes, then windowing around the search term. Exclude Text from $select on list queries."
+    },
+    {
+      "normalized": "language",
+      "sourcePath": "d.results[].LanguageOfText   (NOT .Language)",
+      "note": "MOST IMPORTANT GOTCHA. Language (part of the key, DE|FR|IT|RM|EN) selects the localization of the LABEL fields only (CouncilName, ParlGroupName, CantonName) — it does NOT translate Text. Verified: Transcript(ID=377739L) fetched as DE, FR and IT returned byte-identical Text (md5 083bf267f2d3) with LanguageOfText=\"DE\" in all three. Swiss debates are recorded in the language actually spoken. So map normalized.language = LanguageOfText (values DE / FR / IT; within Language='DE' the distribution is DE=207704, FR=57625, IT=2498). Always pin Language='DE' (or one fixed value) in every query to avoid 5x duplicate rows. Language='EN' is a trap: it returns FRENCH label values (\"Conseil national\"), so EN is not a real translation layer."
+    },
+    {
+      "normalized": "sourceUrl",
+      "sourcePath": "constructed from IdSubject",
+      "note": "https://www.parlament.ch/de/ratsbetrieb/amtliches-bulletin/amtliches-bulletin-die-verhandlungen?SubjectId={IdSubject}  — verified HTTP 200 for SubjectId=66699 and 72019, <title>Amtliches Bulletin</title>. Swap the /de/ segment for /fr/, /it/, /rm/ or /en/ (all five confirmed present as hreflang variants). Anchor #TopOfDebate is used by the site itself. This is an Angular SPA: the speech text is fetched client-side and is NOT in the returned HTML, so treat it strictly as a human-facing citation link, never as a scrape target. The API-canonical URI is also available at d.results[].__metadata.uri (e.g. https://ws.parlament.ch/OData.svc/Transcript(ID=350903L,Language='DE')) — good as a machine provenance value."
+    },
+    {
+      "normalized": "docId",
+      "sourcePath": "d.results[].Type  and  SortOrder",
+      "note": "Filtering aid, not output. Type (Edm.Int16, non-null): 1 = spoken contribution / Votum (277308 rows) ← the Hansard-equivalent you want; 2 = vote result block (33278, e.g. \"Abstimmung - Vote … Für den Antrag der Mehrheit ... 28 Stimmen\"); 3 = agenda heading / procedural (35847, e.g. \"1. Wahl der Präsidentin für 2025/26\"); values 0, 4, 5 exist in the model but have 0 rows. ALWAYS add 'Type eq 1' unless you deliberately want vote/heading text. SortOrder (Int32) is the position within the sitting — use as the secondary $orderby for correct reading order. VoteId / VoteBusinessNumber / VoteBusinessShortNumber link vote rows to /odata.svc/Vote and /odata.svc/Voting (out of scope here — that's voting records, not speech)."
+    }
+  ],
+  "fullTextAccess": "EMBEDDED — this is the strong point of this source. The complete verbatim speech text is returned inline in the Transcript.Text field of the very same search response; there is no second fetch, no PDF, no XML-file download step. Verified by reading full 6800-char speeches directly out of the JSON. Coverage runs from MeetingDate 19991206 (winter session 1999, i.e. the start of the 46th legislature) through 20260619, 346433 speech-level rows per language axis, of which 277308 are Type=1 spoken contributions. Text arrives as a <pd_text><p>…</p></pd_text> pseudo-XML envelope with inline <i>/<b> and typesetting control tokens ([GZ], [NB], [NAM], [VS], [PAGE n]) that must be scrubbed. Practical ingestion advice: do NOT try to full-text search Text at query time in a Lambda (see rateLimits — 40-85 s cold). Instead bulk-harvest by walking MeetingDate windows (or Modified for deltas) with Language='DE' and Type eq 1, page via __next, and index Text in your own search engine. A full one-language harvest is ~277k rows; at 1000 rows/page that is ~280 requests. Note that Text is byte-identical across all five Language rows, so harvest exactly one Language value and you lose nothing.",
+  "languages": "Speech text is in the language actually spoken on the floor — read it from LanguageOfText, not Language. Observed distribution (within Language='DE', so over the full corpus): DE 207704, FR 57625, IT 2498 (RM/Romansh: none observed as a text language). The Language key axis (DE|FR|IT|RM|EN) only localizes label fields — CouncilName renders as Nationalrat / Conseil national / Consiglio nazionale, ParlGroupName as Grüne Fraktion / Groupe des VERT-E-S / Gruppo dei Verdi — while Text stays in the original spoken language (proven: identical md5 across DE/FR/IT for the same ID). Consequence for the pipeline: (a) pin one Language value in EVERY query or you get up to 5x duplicates; (b) a free-text search for a German term will only find German-language speeches — the same debate argued in French is invisible to that query, so a good UX needs the query translated per target language or a multilingual embedding index on your side; (c) Language='EN' is not usable as English — it returns French label values. SubjectBusiness helpfully carries pre-localized TitleDE/TitleFR/TitleIT for debate titles (TitleIT can be null).",
+  "rateLimits": "No documented rate limit; no key; no quota. 8 rapid sequential requests all returned HTTP 200 with no 429 and no Retry-After. Response headers carry no rate-limit fields; they set cache-control: no-cache, no-store and an Akamai akamai-grn trace id. THE REAL CONSTRAINT IS LATENCY, NOT THROTTLING, and it is the single biggest implementation hazard here: an unbounded substringof() over Text is a full scan of 346k MAX-length nvarchar rows. Measured cold, on distinct fresh terms so caching could not help: 'Velostreifen' 44.7 s, 'Kernfusionskraftwerk' 43.1 s, and one 'Klimawandel' query with $orderby 84.0 s. The exact same request repeated immediately returned in 0.157 s — there is a warm cache (SQL plan/buffer pool) that makes naive benchmarking wildly optimistic, so never trust a repeat measurement. Adding a MeetingDate range brought a cold query down to 4.7 s, and the canonical example (Type eq 1 + one-year MeetingDate window + $select without Text) ran in 2.0-4.0 s. MITIGATIONS, in order: (1) never issue substringof(...,Text) without a MeetingDate bound; (2) always $select away Text on list pages; (3) set the client/Lambda socket timeout to 120 s and the Lambda timeout above that, or the call will be killed mid-scan; (4) prefer /$count for sizing (cheap); (5) for anything production-grade, bulk-harvest and search locally rather than proxying user queries through substringof. Sandbox egress was NOT blocked at any point — every measurement above is a real observation.",
+  "gotchas": [
+    "oda.parlament.ch DOES NOT EXIST — NXDOMAIN, verified with dig and curl. The hostname in our brief is wrong. The only live API host is ws.parlament.ch. ws-old.parlament.ch (still named on the official Open Data page) answers 200 at / but 404 at /odata.svc — it is NOT a usable mirror. Allowlist ws.parlament.ch (API) and www.parlament.ch (human sourceUrl + docs page) only.",
+    "LATENCY IS THE LAMBDA KILLER: cold unbounded substringof(term,Text) measured 43-85 s. A default 3-30 s Lambda/HTTP timeout WILL fail intermittently and will look like a flaky API. Mandatory: always AND a MeetingDate range into the $filter, and set socket timeout >= 120 s. Repeat-request timings (0.157 s) are cache artifacts — do not benchmark with the same term twice.",
+    "Language is NOT a translation axis for speech text. All five Language values (DE/FR/IT/RM/EN) return byte-identical Text (verified md5 083bf267f2d3 on ID=377739 across DE/FR/IT) with LanguageOfText='DE'. Language localizes only labels. Map normalized.language from LanguageOfText. And Language='EN' returns FRENCH labels, so there is no real English layer.",
+    "OMITTING the Language filter yields 5x DUPLICATE rows for every speech (346433 x 5). The entity key is composite (ID, Language). Pin Language='DE' in every single query.",
+    "There is NO title field on Transcript. VoteBusinessTitle exists but was NULL on every speech row observed (it is vote-row-only). The real debate title requires a join to SubjectBusiness on IdSubject. And the obvious shortcut, $expand=Businesses, is BROKEN — it returns HTTP 500 EntityCommandExecutionException (server-side EF bug). $expand=Subjects and $expand=MembersCouncil do work.",
+    "Type must be filtered. Only Type=1 (277308 rows) is actual speech. Type=2 (33278) is vote-tally text and Type=3 (35847) is agenda headings; both have SpeakerFullName as an EMPTY STRING (not null) and null SpeakerFunction. Without 'Type eq 1' your corpus is ~20% non-speech boilerplate attributed to nobody.",
+    "OData v2 ONLY. contains() returns HTTP 400 — you must use substringof('term',Field), and note the v2 argument order is (needle, haystack), the reverse of v4's contains(haystack, needle). Getting this backwards is a silent-wrong-results bug, not an error.",
+    "Int64 keys serialize as JSON STRINGS: ID comes back as \"350903\", IdSubject as \"66699\", IdSession as \"5206\". Do not assume numbers. Conversely, in $filter, Int64 literals need an L suffix (IdSubject eq 66699L, and the entity path is Transcript(ID=350903L,Language='DE')) while Int32 fields must NOT have it (Session ID eq 5206, PersonNumber eq 4246). Mixing these up gives HTTP 400.",
+    "IdSession is a STRING on Transcript (quote it: IdSession eq '5206') but an INT32 on Session (ID eq 5206, unquoted). Same logical key, two different types across entity sets.",
+    "Dates are two incompatible representations: MeetingDate is a YYYYMMDD *string* (filter with quotes, ge '20240101'), while Start/End/Modified are Edm.DateTime serialized as \"/Date(1734536444504)/\" and filtered with the v2 literal datetime'2023-01-01T00:00:00'. Neither accepts plain ISO strings. Start is nullable, so filtering on it silently drops rows — prefer MeetingDate for windows.",
+    "JSON response shape is INCONSISTENT: collections normally return {\"d\":{\"results\":[...]}} but with $format=json and no $inlinecount some responses degrade to {\"d\":[...]} (bare array). This bit me repeatedly during testing. Always send $inlinecount=allpages to force the object form (and to get d.__count), and code defensively for both.",
+    "Default JSON is 'verbose': every row is bloated with a __metadata block and __deferred navigation stubs. Always use $select to cut payload — and specifically to EXCLUDE Text on list views, since Text is MAX-length (6800+ chars per speech).",
+    "$top is silently capped at 1000. Asking for 1200 returns 1000 rows plus a __next link with no error. Follow d.__next verbatim; never hand-build a $skiptoken (its shape changes when $orderby is present: '20260617',377797L,'DE').",
+    "Text is not plain text. It carries a <pd_text>/<p>/<i>/<b> envelope plus typesetting control tokens [GZ], [NB], [NAM], [VS] and [PAGE n] that will pollute embeddings and snippets if not scrubbed.",
+    "ParlGroupAbbreviation is the parliamentary GROUP (Fraktion), not the party, and it is NULL for Federal Councillors (ministers, SpeakerFunction='BR-M'). Its long form is localized by Language. For the actual party you must join MemberCouncil on PersonNumber (→ PartyAbbreviation 'GRÜNE', PartyName 'GRÜNE Schweiz').",
+    "CouncilName/CouncilId describe the SPEAKER's council and read 'Bundesrat' for government ministers and null on non-speech rows — they are NOT the chamber where the debate happened. Use MeetingCouncilAbbreviation ('N' Nationalrat / 'S' Ständerat) for chamber.",
+    "SpeakerFullName is ordered SURNAME-FIRST ('Rösti Albert', 'Hübscher Martin'). Exact-eq matching with 'Firstname Lastname' will always return zero rows.",
+    "The sourceUrl page (www.parlament.ch/…?SubjectId=N) is an Angular SPA — verified 200 / 214 KB with no speech text in the served HTML. Fine as a citation link for users, useless as a scrape fallback.",
+    "Terms of use are binding and specific: cite «Parlamentsdienste der Bundesversammlung, Bern», must not alter content, must not present the data as an official publication, and must display the download date. Budget UI space for the attribution and store a retrieval timestamp per record.",
+    "The official Open Data page states this OData interface is LEGACY and slated for replacement by a 'new, more user-friendly API' with no published date, while 'current web services remain available for the time being'. Also flags a July 2023 backend migration that renamed business statuses/decisions. Treat the schema as stable-but-deprecated; isolate it behind an adapter and subscribe to their change-notification form.",
+    "$metadata is 130 KB of EDMX with ~50 entity sets and lots of look-alike names (Vote/Voting, Business/Bill, Subject/SubjectBusiness). Note the scope trap: Vote/Voting are VOTING RECORDS and Bill/Business are BILL TRACKING — Transcript is the only speech source. Do not let the richer-looking Business entity pull you off-scope.",
+    "Errors return HTTP 500 with an ASP.NET .NET stack trace in the JSON body and a generic German message ('An error occurred while processing this request.'), with no machine-readable error code. Malformed $filter gives 400. Log the innererror.type to tell a genuine bug (EntityCommandExecutionException) from your own syntax error."
+  ],
+  "confidence": "high"
+}
