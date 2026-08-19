@@ -68,6 +68,9 @@ Per-jurisdiction data-source details live in `docs/multi-gov/CHANGES.md`.
   exported file is actually tracked after the sync.
 
 ### Changed
+- COMPLIANCE.md currency pass: US Congress row reflects the opt-in reality, C7 (GovInfo
+  key) and W8 (SigV4 MCP validation) are marked resolved, and the secret names match the
+  deployed `parlamentgpt/*` names.
 - The maintainers' publish workflow now runs from `main` and generates the internal
   `public` branch as a cleaned content mirror (file-for-file identical to the GitHub
   sample); internal working files exist on `main` only.

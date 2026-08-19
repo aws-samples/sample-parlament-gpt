@@ -24,14 +24,15 @@ derivative-work and "presented as official" halves below still need a human deci
 | 🇪🇺 EU Parliament | CC BY 4.0 | Yes — rendered | ✅ Live | None |
 | 🇨🇭 Switzerland | Binding, specific terms | Yes — rendered, **but incomplete** | ✅ Live | [C2](#c2-switzerland-requires-a-download-date-we-do-not-display) — download date missing |
 | 🇦🇹 Austria | CC BY 4.0 + disclaimer | Yes — rendered | ✅ Live | [C3](#c3-austria-reserves-the-right-to-prohibit-specific-uses) — noted, not blocking |
-| 🇺🇸 US Congress | Public domain (GPO) | Courtesy only | ✅ Live | None — no licensing constraint |
+| 🇺🇸 US Congress | Public domain (GPO) | Courtesy only | ⚙️ Opt-in (`enableUsCongress=true`; the demo deploys it) | None — no licensing constraint; operator requests the free api.data.gov key |
 | 🇨🇦 Canada | Speaker's permission — **excludes commercial use** | Yes + "not official" disclaimer | ❌ **Disabled** | [C4](#c4-canada-commercial-use-carve-out) **and** [C5](#c5-canada-robotstxt-disallows-the-search-endpoint) |
 | 🇦🇺 Australia | **CC BY-NC-ND 3.0 AU** | Yes | ❌ **Disabled** | [C4](#c4-canada-commercial-use-carve-out)-adjacent: NonCommercial **and** NoDerivatives |
 | 🇫🇷 France | Open (public site + static files) | Yes — rendered | ❌ Disabled | Not compliance — needs an ingest run (see [§3](#3-outstanding-work-once-compliance-is-cleared)) |
 | 🇳🇱 Netherlands | Open, anonymous | Yes — rendered | ❌ Disabled | Not compliance — needs an ingest run |
 
-Six jurisdictions are deployed. Four are built, unit-tested and **provisioned nowhere** — an infra
-test asserts they create zero CloudFormation resources.
+Five jurisdictions deploy by default; US Congress is opt-in (self-requested API key). Four are
+built, unit-tested and **provisioned nowhere** — an infra test asserts they create zero
+CloudFormation resources.
 
 ---
 
@@ -135,17 +136,15 @@ published demo key rather than a credential of ours, but committing a key-shaped
 scanners and is a bad pattern regardless of provenance.
 
 **Action:** request an own key from `parlamentsdokumentation@bundestag.de` and put it in the
-`bundestag/dip-api-key` secret. Until then Germany's reliability depends on a key we don't own.
+`parlamentgpt/dip-api-key` secret. Until then Germany's reliability depends on a key we don't own.
 
-### C7 — US GovInfo key not yet issued
-**Blocks:** US Congress at runtime (not a licensing issue).
+### C7 — US GovInfo key *(resolved; kept for the record)*
+**Blocks:** nothing anymore (and never was a licensing issue).
 
-No licensing constraint — GPO states Congressional Record material is public domain. But
-`api.govinfo.gov` requires a key, and the shared `DEMO_KEY` is throttled to ~10 requests/hour
-(verification ran out of quota mid-session). The secret `bundestag/govinfo-api-key` is created empty.
-
-**Action:** register at <https://www.govinfo.gov/api-signup> (email only, instant) and fill the
-secret. A registered key allows 36,000 req/hour.
+No licensing constraint — GPO states Congressional Record material is public domain. The source is
+now **opt-in** (`enableUsCongress=true`): the deploy creates the `parlamentgpt/govinfo-api-key`
+secret empty, and the operator registers at <https://www.govinfo.gov/api-signup> (email only,
+instant; 36,000 req/hour) and fills it. The demo deployment runs with an issued key.
 
 ---
 
@@ -203,8 +202,10 @@ The adapter now raises `EuThrottled` instead of misreporting a throttle as "no r
 distinction is tested). Still to do: a deliberate 3–6 s delay between sequential calls, exponential
 backoff starting at 30–60 s, and never fanning out parallel requests to that host. **Est. 2–4 h.**
 
-### W8 — Verify the SigV4-signed MCP transport against a live Gateway
-The one thing that cannot be checked without deploying. The agent authenticates to the Gateway with
+### W8 — Verify the SigV4-signed MCP transport against a live Gateway *(done)*
+**Resolved:** validated against the live Gateway and exercised by the e2e test; see
+`agent/src/parlamentgpt_agent/gateway.py` (ADR risk R4 retired). Originally:
+the one thing that cannot be checked without deploying. The agent authenticates to the Gateway with
 IAM/SigV4; no AWS sample shows a SigV4-signed MCP client, so the two unknowns are whether the SSE
 `GET` needs signing as well as the JSON-RPC `POST`, and whether the payload hash works with
 streamable-HTTP framing. Unit-tested; a Cognito M2M fallback is wired behind
