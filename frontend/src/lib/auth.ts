@@ -15,9 +15,16 @@ const CLIENT_SECRET = process.env.COGNITO_CLIENT_SECRET ?? "";
 const COGNITO_DOMAIN = (process.env.COGNITO_DOMAIN ?? "").replace(/\/$/, "");
 
 export function authConfigured(): boolean {
-  // CLIENT_SECRET included deliberately: without it the code exchange can only fail
-  // with an opaque Cognito 400 — better to report "auth not configured" up front.
-  return Boolean(ISSUER && CLIENT_ID && CLIENT_SECRET && COGNITO_DOMAIN);
+  // Enough to VERIFY tokens (issuer/JWKS + audience). Deliberately does not require the
+  // client secret: a runtime that can verify but not exchange must keep existing
+  // sessions working instead of bouncing everyone into a sign-in loop.
+  return Boolean(ISSUER && CLIENT_ID && COGNITO_DOMAIN);
+}
+
+export function exchangeConfigured(): boolean {
+  // The code exchange additionally needs the confidential-client secret; without it the
+  // login route reports "not configured" up front instead of an opaque Cognito 400.
+  return authConfigured() && Boolean(CLIENT_SECRET);
 }
 
 // One JWKS per runtime instance; jose caches and refreshes keys internally.

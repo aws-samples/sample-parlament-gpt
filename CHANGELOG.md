@@ -9,6 +9,14 @@ Per-jurisdiction data-source details live in `docs/multi-gov/CHANGES.md`.
 ## [Unreleased]
 
 ### Security
+- Advisory round: token verification decoupled from the code-exchange secret
+  (`authConfigured()` vs. new `exchangeConfigured()` — a runtime that can verify but not
+  exchange keeps sessions working instead of looping sign-in); answer-fidelity failure
+  paths log at ERROR (T10/A6 must not hide below alarm level); a
+  `ParlamentGPT/RevocationDegraded` metric makes a revocation-store outage alarmable
+  (S7); S6 discloses the dormant Cognito gateway-auth fallback; ADR-001 carries a
+  point-in-time header naming its known drift; model-ID references unified to the real
+  default (`.env.example`, runbook).
 - Threat-model honesty round: S2 now states that the sign-up allowlist **defaults to
   open** (restricting it is a per-deployment context decision), D1 states that its cost
   bound assumes that restriction (with open sign-up an attacker rotates accounts, not

@@ -4,7 +4,13 @@ Verification complete. All decision-critical claims tested against the actual re
 
 # ADR-001: Multi-Government Parliamentary Debate Agent via AgentCore Gateway + One Lambda per Government
 
-**Status:** Proposed / implementation-ready
+**Status:** Accepted — **point-in-time design record (2026-08-03), since implemented.**
+Where this document and the code disagree, the code and `docs/threat-model.md` are
+authoritative. Known drift at the time of publishing: the Gateway no longer sets
+`exceptionLevel` (Q7 confirmed-removed); the runtime custom resource's policy lists
+exactly its three lifecycle actions (the `bedrock-agentcore:*` wildcard this document
+criticises is gone); the agent-stack class doc has been refreshed. Line references into
+source files reflect the codebase as of this date and are not maintained.
 **Date:** 2026-08-03
 **Verified against:** `aws-cdk-lib@2.259.0`, `strands-agents@1.50.2`, `mcp@1.29.0`, `bedrock-agentcore@1.19.0` as installed in this repo.
 

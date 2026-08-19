@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authConfigured, authorizeUrl, requestOrigin, STATE_COOKIE } from "@/lib/auth";
+import { authorizeUrl, exchangeConfigured, requestOrigin, STATE_COOKIE } from "@/lib/auth";
 import { randomBytes } from "node:crypto";
 
 export const runtime = "nodejs";
@@ -17,7 +17,7 @@ function safeNext(raw: string | null): string {
  * path) and redirects to the Cognito hosted UI.
  */
 export async function GET(req: NextRequest) {
-  if (!authConfigured()) {
+  if (!exchangeConfigured()) {
     return NextResponse.json({ error: "auth_not_configured" }, { status: 500 });
   }
   const nonce = randomBytes(16).toString("base64url");

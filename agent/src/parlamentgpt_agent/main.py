@@ -530,7 +530,9 @@ def _extract_steps(messages: Any, final_answer: str) -> list[dict[str, Any]]:
                     count, raw, truncated = _summarise_tool_result(block["toolResult"])
                     steps.append({"type": "tool_result", "count": count, "raw": raw, "truncated": truncated})
     except Exception as exc:  # nosec B110 - trace extraction is best-effort; a malformed block must not fail the answer
-        log.warning("trace extraction failed on a malformed block: %s", exc)
+        # ERROR, not WARNING: operators alarming on ERROR must see the paths that degrade
+        # answer fidelity (threat model T10 / asset A6).
+        log.error("trace extraction failed on a malformed block: %s", exc)
     return steps
 
 
@@ -578,9 +580,10 @@ def _extract_sources(messages: Any) -> list[dict[str, Any]]:
                     if isinstance(data, dict) and isinstance(data.get("results"), list):
                         sources.extend(data["results"])
     except Exception as exc:  # nosec B110 - source extraction is best-effort; a malformed block must not fail the answer
-        # Loud, because empty sources also triggers the text-fallback recovery path, which
-        # would silently replace a real answer with the canned listing (asset A6).
-        log.warning("source extraction failed on a malformed block: %s", exc)
+        # ERROR, because empty sources also triggers the text-fallback recovery path, which
+        # would silently replace a real answer with the canned listing (threat model T10 /
+        # asset A6 — the worst-case product failure must not hide below alarm level).
+        log.error("source extraction failed on a malformed block: %s", exc)
     return sources
 
 

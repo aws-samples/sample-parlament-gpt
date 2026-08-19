@@ -355,11 +355,32 @@ export class FrontendStack extends Stack {
     );
     sessionsTable.grantReadWriteData(taskDef.taskRole);
 
+    // Own the app log group explicitly so a metric filter can hang off it (below).
+    const webLogGroup = new logs.LogGroup(this, "WebLogs", {
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
+
+    // Tripwire for degraded sign-out revocation (threat model S7): the fail-open read
+    // path and a failed revocation write each log one of these exact phrases. The custom
+    // metric costs nothing until alarmed on; a prolonged non-zero level means revocation
+    // is effectively OFF while tokens stay valid (up to 12 h).
+    new logs.MetricFilter(this, "RevocationDegradedMetric", {
+      logGroup: webLogGroup,
+      filterPattern: logs.FilterPattern.anyTerm(
+        "revocation check unavailable",
+        "failed to record sign-out revocation",
+      ),
+      metricNamespace: "ParlamentGPT",
+      metricName: "RevocationDegraded",
+      metricValue: "1",
+    });
+
     const container = taskDef.addContainer("web", {
       image: ecs.ContainerImage.fromDockerImageAsset(image),
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: "frontend",
-        logRetention: logs.RetentionDays.ONE_MONTH,
+        logGroup: webLogGroup,
       }),
       environment: {
         AWS_REGION: region,

@@ -1,7 +1,8 @@
 # Runbook
 
 ## 0. Prerequisites
-- AWS account with Bedrock model access to Claude Opus 4.8 (`global.anthropic.claude-opus-4-8`)
+- AWS account with Bedrock model access for the configured model — default
+  `global.anthropic.claude-sonnet-4-6` (`modelId` context, see README Configuration) —
   enabled in your region (default `eu-central-1`).
 - Tools: Node ≥20, Python ≥3.11, Docker, AWS CDK v2 (`npm i -g aws-cdk`), AWS CLI configured.
 - A Bundestag DIP API key.
@@ -96,7 +97,7 @@ aws secretsmanager delete-secret --secret-id parlamentgpt/dip-api-key --force-de
   the `bedrock-agentcore-control` API to the custom resource SDK. Build+push the image (CDK does
   this) and create the runtime with the `agentcore` CLI using the same image URI, role, env vars,
   and VPC config (see `docs/architecture.md`), then set `AGENT_RUNTIME_ARN` on the frontend stack.
-- **Bedrock AccessDenied:** enable model access for Claude Opus 4.8 in the Bedrock console; verify
+- **Bedrock AccessDenied:** enable model access for the configured model in the Bedrock console; verify
   the inference-profile ARN matches the IAM resource pattern in `infra/lib/agent-stack.ts`.
 - **Frontend 502:** check `AGENT_RUNTIME_ARN` env on the task and the task role's
   `InvokeAgentRuntime` permission; inspect CloudWatch logs `/frontend` and the agent log group.
